@@ -1,0 +1,23 @@
+{
+  "name": "backend",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "db:seed": "tsx src/db/seed.ts"
+  },
+  "dependencies": {
+    "@faker-js/faker": "^9.9.0",
+    "@libsql/client": "^0.3.6",
+    "bcryptjs": "^2.4.3",
+    "drizzle-orm": "^0.29.0",
+    "hono": "^3.11.7"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.8.10",
+    "drizzle-kit": "^0.20.6",
+    "tsx": "^3.14.0",
+    "typescript": "^5.2.2"
+  }
+}
