@@ -5,6 +5,7 @@
 [x] Likewise for the variants, I would like to see all the update proposal and to be able to click on the pill and get redirected to the modal that allow me to review the proposals (that modal exists already).
 [x] When running in dev mode, when admin, I would like to have a button to wipe all the vehicles. The same for proposals.
 [x] Unify the UI/UX, buttons, fields, vertical / horizontal alignment, grid components features.
-[] I want to have a contribution form using https://daisyui.com/components/steps
+[x] I want to have a contribution form using https://daisyui.com/components/steps
+[] Create a new way of displaying vehicles, using cards and flex layout, so it looks better.
 [] Add a monetezation mechanism for the users to top-up their credit balance. Use wise business.
 [] Implement i18n

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { submitContribution, fetchMyContributions, Contribution, Vehicle, cancelMyContribution, fetchApiKeys, createApiKey, revokeApiKey, fetchApiUsage, fetchApiUsageStats, ApiKey, DailyUsage, DailyUsagePerKey } from '../services/api';
 import ContributionForm from '../components/ContributionForm';
@@ -7,6 +8,7 @@ import ApiUsageChart from '../components/ApiUsageChart';
 import ApiUsageHistoryModal from '../components/ApiUsageHistoryModal';
 
 const UserDashboardPage = () => {
+  const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const [showContributionModal, setShowContributionModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +21,7 @@ const UserDashboardPage = () => {
   const [apiError, setApiError] = useState<string | null>(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
-  const handleShowContributionModal = () => setShowContributionModal(true);
+  const handleNavigateToContribution = () => navigate('/contribute/vehicle');
   const handleCloseContributionModal = () => setShowContributionModal(false);
 
   const loadMyContributions = useCallback(async () => {
@@ -311,7 +313,7 @@ const UserDashboardPage = () => {
           <div className="text-sm text-gray-500 mb-4">
             Approved submissions grant credits; rejected ones do not. Moderators may request additional info.
           </div>
-          <button className="btn btn-primary" onClick={handleShowContributionModal}>
+          <button className="btn btn-primary" onClick={handleNavigateToContribution}>
             Submit Contribution
           </button>
         </div>

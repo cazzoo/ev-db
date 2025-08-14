@@ -15,7 +15,7 @@ import {
   fetchVehicles,
 } from '../services/api';
 
-// Inline editable field component (defined outside of main component to avoid re-creation)
+// Enhanced inline editable field component with improved UX
 const EditableField = ({
   contributionId,
   fieldName,
@@ -34,7 +34,7 @@ const EditableField = ({
   contributionId: number;
   fieldName: string;
   value: string | number | undefined;
-  type?: 'text' | 'number';
+  type?: 'text' | 'number' | 'textarea';
   label: string;
   unit?: string;
   isEditable?: boolean;
@@ -52,37 +52,77 @@ const EditableField = ({
   const isDifferentFromOriginal = showDiff && originalValue !== undefined &&
     String(value || '').trim() !== String(originalValue || '').trim();
 
+  // Read-only view
   if (!isEditable || !isEditMode) {
     return (
-      <div className="flex justify-between py-1">
-        <span className="text-gray-600">{label}:</span>
-        <span className={`font-medium ${isModified ? 'text-orange-600' : ''} ${isDifferentFromOriginal ? 'text-green-600 bg-green-50 px-2 py-1 rounded' : ''}`}>
-          {draftValue}{unit}
-          {isModified && <span className="ml-1 text-orange-500">*</span>}
-          {isDifferentFromOriginal && !isModified && <span className="ml-1 text-green-500">●</span>}
+      <div className="flex justify-between items-center py-3 border-b border-base-200 last:border-b-0">
+        <span className="text-base-content/70 font-medium">{label}:</span>
+        <span className={`font-semibold ${
+          isModified ? 'text-warning' :
+          isDifferentFromOriginal ? 'text-success bg-success/10 px-2 py-1 rounded-md' :
+          'text-base-content'
+        }`}>
+          {draftValue || 'Not specified'}{unit}
+          {isModified && <span className="ml-2 text-warning">●</span>}
+          {isDifferentFromOriginal && !isModified && <span className="ml-2 text-success">●</span>}
         </span>
       </div>
     );
   }
 
+  // Edit mode view
   return (
-    <div className="flex justify-between items-center py-1">
-      <label className="text-gray-600">{label}:</label>
-      <div className="flex items-center">
-        <input
-          type={type}
+    <div className="form-control w-full mb-6">
+      <label className="label pb-2">
+        <span className="label-text font-semibold text-base flex items-center gap-2">
+          {label}
+          {isModified && (
+            <div className="badge badge-warning badge-sm">
+              Modified
+            </div>
+          )}
+        </span>
+        {unit && <span className="label-text-alt text-base-content/60 font-medium">{unit}</span>}
+      </label>
+
+      {type === 'textarea' ? (
+        <textarea
           value={draftValue || ''}
-          onChange={(e) => {
-            const newValue = type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value;
-            updateDraftField(contributionId, fieldName, newValue);
-          }}
-          className={`input input-sm w-32 ${isModified ? 'input-warning border-orange-400' : 'input-bordered'} ${isDifferentFromOriginal && !isModified ? 'input-success border-green-400' : ''}`}
-          placeholder={`Enter ${label.toLowerCase()}`}
+          onChange={(e) => updateDraftField(contributionId, fieldName, e.target.value)}
+          className={`textarea textarea-bordered w-full h-24 ${isModified ? 'textarea-warning' : ''}`}
+          placeholder={`Enter ${label.toLowerCase()}...`}
         />
-        {unit && <span className="ml-1 text-gray-500">{unit}</span>}
-        {isModified && <span className="ml-1 text-orange-500">*</span>}
-        {isDifferentFromOriginal && !isModified && <span className="ml-1 text-green-500">●</span>}
-      </div>
+      ) : (
+        <div className="join w-full">
+          <input
+            type={type}
+            value={draftValue || ''}
+            onChange={(e) => {
+              const newValue = type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value;
+              updateDraftField(contributionId, fieldName, newValue);
+            }}
+            className={`input input-bordered join-item flex-1 ${isModified ? 'input-warning' : ''}`}
+            placeholder={`Enter ${label.toLowerCase()}...`}
+            step={type === 'number' ? '0.1' : undefined}
+          />
+          {unit && (
+            <span className="bg-base-200 text-base-content/70 px-4 flex items-center text-sm font-semibold border border-l-0 border-base-300 join-item">
+              {unit}
+            </span>
+          )}
+        </div>
+      )}
+
+      {showDiff && originalValue !== undefined && String(originalValue).trim() !== String(draftValue || '').trim() && (
+        <label className="label pt-1">
+          <span className="label-text-alt text-info flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Original: {originalValue}{unit}
+          </span>
+        </label>
+      )}
     </div>
   );
 };
@@ -115,8 +155,10 @@ const InlineEditableVehicleDetails = ({
         </div>
         <div className="card bg-base-100 shadow-sm">
           <div className="card-body">
-            <h5 className="card-title text-lg">Proposed Vehicle Data</h5>
-            <div className="space-y-2">
+            <h5 className="card-title text-lg mb-4">
+              {isEditMode ? 'Edit Proposed Changes' : 'Proposed Vehicle Data'}
+            </h5>
+            <div className={isEditMode ? 'space-y-1' : 'space-y-2'}>
               <EditableField contributionId={contribution.id} fieldName="make" value={vehicleData.make} label="Make" isEditable={isEditable} isEditMode={isEditMode} getDraftValue={getDraftValue} isFieldModified={isFieldModified} updateDraftField={updateDraftField} />
               <EditableField contributionId={contribution.id} fieldName="model" value={vehicleData.model} label="Model" isEditable={isEditable} isEditMode={isEditMode} getDraftValue={getDraftValue} isFieldModified={isFieldModified} updateDraftField={updateDraftField} />
               <EditableField contributionId={contribution.id} fieldName="year" value={vehicleData.year} type="number" label="Year" isEditable={isEditable} isEditMode={isEditMode} getDraftValue={getDraftValue} isFieldModified={isFieldModified} updateDraftField={updateDraftField} />
@@ -126,7 +168,7 @@ const InlineEditableVehicleDetails = ({
               <EditableField contributionId={contribution.id} fieldName="acceleration" value={vehicleData.acceleration} type="number" label="0-100 km/h" unit=" s" isEditable={isEditable} isEditMode={isEditMode} getDraftValue={getDraftValue} isFieldModified={isFieldModified} updateDraftField={updateDraftField} />
               <EditableField contributionId={contribution.id} fieldName="topSpeed" value={vehicleData.topSpeed} type="number" label="Top Speed" unit=" km/h" isEditable={isEditable} isEditMode={isEditMode} getDraftValue={getDraftValue} isFieldModified={isFieldModified} updateDraftField={updateDraftField} />
               <EditableField contributionId={contribution.id} fieldName="price" value={vehicleData.price} type="number" label="Price" unit=" $" isEditable={isEditable} isEditMode={isEditMode} getDraftValue={getDraftValue} isFieldModified={isFieldModified} updateDraftField={updateDraftField} />
-              <EditableField contributionId={contribution.id} fieldName="description" value={vehicleData.description} label="Description" isEditable={isEditable} isEditMode={isEditMode} getDraftValue={getDraftValue} isFieldModified={isFieldModified} updateDraftField={updateDraftField} />
+              <EditableField contributionId={contribution.id} fieldName="description" value={vehicleData.description} type="textarea" label="Description" isEditable={isEditable} isEditMode={isEditMode} getDraftValue={getDraftValue} isFieldModified={isFieldModified} updateDraftField={updateDraftField} />
             </div>
           </div>
         </div>
@@ -213,8 +255,10 @@ const InlineEditableVehicleDetails = ({
         {/* Proposed Changes */}
         <div className="card bg-base-100 shadow-sm">
           <div className="card-body">
-            <h5 className="card-title text-lg">Proposed {isVariant ? 'Variant' : 'Changes'}</h5>
-            <div className="space-y-2">
+            <h5 className="card-title text-lg mb-4">
+              {isEditMode ? `Edit Proposed ${isVariant ? 'Variant' : 'Changes'}` : `Proposed ${isVariant ? 'Variant' : 'Changes'}`}
+            </h5>
+            <div className={isEditMode ? 'space-y-1' : 'space-y-2'}>
               <EditableField contributionId={contribution.id} fieldName="make" value={vehicleData.make} label="Make" isEditable={isEditable} isEditMode={isEditMode} getDraftValue={getDraftValue} isFieldModified={isFieldModified} updateDraftField={updateDraftField} originalValue={original?.make} showDiff={!!original} />
               <EditableField contributionId={contribution.id} fieldName="model" value={vehicleData.model} label="Model" isEditable={isEditable} isEditMode={isEditMode} getDraftValue={getDraftValue} isFieldModified={isFieldModified} updateDraftField={updateDraftField} originalValue={original?.model} showDiff={!!original} />
               <EditableField contributionId={contribution.id} fieldName="year" value={vehicleData.year} type="number" label="Year" isEditable={isEditable} isEditMode={isEditMode} getDraftValue={getDraftValue} isFieldModified={isFieldModified} updateDraftField={updateDraftField} originalValue={original?.year} showDiff={!!original} />
@@ -224,7 +268,7 @@ const InlineEditableVehicleDetails = ({
               <EditableField contributionId={contribution.id} fieldName="acceleration" value={vehicleData.acceleration} type="number" label="0-100 km/h" unit=" s" isEditable={isEditable} isEditMode={isEditMode} getDraftValue={getDraftValue} isFieldModified={isFieldModified} updateDraftField={updateDraftField} originalValue={original?.acceleration} showDiff={!!original} />
               <EditableField contributionId={contribution.id} fieldName="topSpeed" value={vehicleData.topSpeed} type="number" label="Top Speed" unit=" km/h" isEditable={isEditable} isEditMode={isEditMode} getDraftValue={getDraftValue} isFieldModified={isFieldModified} updateDraftField={updateDraftField} originalValue={original?.topSpeed} showDiff={!!original} />
               <EditableField contributionId={contribution.id} fieldName="price" value={vehicleData.price} type="number" label="Price" unit=" $" isEditable={isEditable} isEditMode={isEditMode} getDraftValue={getDraftValue} isFieldModified={isFieldModified} updateDraftField={updateDraftField} originalValue={original?.price} showDiff={!!original} />
-              <EditableField contributionId={contribution.id} fieldName="description" value={vehicleData.description} label="Description" isEditable={isEditable} isEditMode={isEditMode} getDraftValue={getDraftValue} isFieldModified={isFieldModified} updateDraftField={updateDraftField} originalValue={original?.description} showDiff={!!original} />
+              <EditableField contributionId={contribution.id} fieldName="description" value={vehicleData.description} type="textarea" label="Description" isEditable={isEditable} isEditMode={isEditMode} getDraftValue={getDraftValue} isFieldModified={isFieldModified} updateDraftField={updateDraftField} originalValue={original?.description} showDiff={!!original} />
             </div>
           </div>
         </div>
@@ -929,63 +973,97 @@ const BrowseContributionsPage = () => {
             />
           )}
           <div className="modal-action">
-            <div className="flex justify-between">
-              {selectedContribution && isAuthenticated && (
-                <div className="flex gap-2">
-                  {user?.userId !== selectedContribution.userId && (
-                    <button className="btn btn-primary btn-sm" onClick={() => handleModalAction(voteOnContribution, selectedContribution.id)} disabled={isSubmitting}>
-                      {isSubmitting ? 'Voting...' : 'Vote (+1)'}
-                    </button>
-                  )}
-                  {user?.userId === selectedContribution.userId && selectedContribution.status === 'PENDING' && (
-                    <>
-                      {!isEditMode ? (
-                        <button className="btn btn-outline btn-warning btn-sm" onClick={toggleEditMode} disabled={isSubmitting}>
-                          Edit Mode
-                        </button>
-                      ) : (
-                        <>
-                          {hasUnsavedChangesForProposal(selectedContribution.id) && (
-                            <>
-                              <button
-                                className="btn btn-success btn-sm"
-                                onClick={() => saveChanges(selectedContribution.id)}
-                                disabled={isSubmitting}
-                              >
-                                {isSubmitting ? 'Saving...' : 'Save Changes'}
-                              </button>
-                              <button
-                                className="btn btn-outline btn-warning btn-sm"
-                                onClick={() => discardChanges(selectedContribution.id)}
-                                disabled={isSubmitting}
-                              >
-                                Discard Changes
-                              </button>
-                            </>
-                          )}
-                          <button className="btn btn-outline btn-secondary btn-sm" onClick={toggleEditMode} disabled={isSubmitting}>
-                            Exit Edit Mode
+            <div className="flex justify-between items-center w-full">
+              {/* Action buttons - left side */}
+              <div className="flex gap-2 flex-wrap">
+                {selectedContribution && isAuthenticated && (
+                  <>
+                    {user?.userId !== selectedContribution.userId && (
+                      <button className="btn btn-primary btn-sm" onClick={() => handleModalAction(voteOnContribution, selectedContribution.id)} disabled={isSubmitting}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
+                        </svg>
+                        {isSubmitting ? 'Voting...' : 'Vote (+1)'}
+                      </button>
+                    )}
+                    {user?.userId === selectedContribution.userId && selectedContribution.status === 'PENDING' && (
+                      <>
+                        {!isEditMode ? (
+                          <button className="btn btn-warning btn-sm" onClick={toggleEditMode} disabled={isSubmitting}>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Edit Mode
                           </button>
-                        </>
-                      )}
-                      <button className="btn btn-outline btn-error btn-sm" onClick={() => handleModalAction(cancelMyContribution, selectedContribution.id)} disabled={isSubmitting}>
-                        {isSubmitting ? 'Cancelling...' : 'Cancel Proposal'}
-                      </button>
-                    </>
-                  )}
-                  {(user?.role === 'ADMIN' || (user?.role === 'MODERATOR' && user?.userId !== selectedContribution.userId)) && (
-                    <>
-                      <button className="btn btn-success btn-sm" onClick={() => handleModalAction(approveContribution, selectedContribution.id)} disabled={isSubmitting}>
-                        {isSubmitting ? 'Approving...' : 'Approve'}
-                      </button>
-                      <button className="btn btn-error btn-sm" onClick={() => handleModalAction(rejectContribution, selectedContribution.id)} disabled={isSubmitting}>
-                        {isSubmitting ? 'Rejecting...' : 'Reject'}
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-              <button className="btn btn-secondary" onClick={handleCloseDiff} disabled={isSubmitting}>Close</button>
+                        ) : (
+                          <>
+                            {hasUnsavedChangesForProposal(selectedContribution.id) && (
+                              <>
+                                <button
+                                  className="btn btn-success btn-sm"
+                                  onClick={() => saveChanges(selectedContribution.id)}
+                                  disabled={isSubmitting}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  {isSubmitting ? 'Saving...' : 'Save Changes'}
+                                </button>
+                                <button
+                                  className="btn btn-outline btn-warning btn-sm"
+                                  onClick={() => discardChanges(selectedContribution.id)}
+                                  disabled={isSubmitting}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                  Discard Changes
+                                </button>
+                              </>
+                            )}
+                            <button className="btn btn-outline btn-secondary btn-sm" onClick={toggleEditMode} disabled={isSubmitting}>
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                              Exit Edit Mode
+                            </button>
+                          </>
+                        )}
+                        <button className="btn btn-error btn-sm" onClick={() => handleModalAction(cancelMyContribution, selectedContribution.id)} disabled={isSubmitting}>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          {isSubmitting ? 'Cancelling...' : 'Cancel Proposal'}
+                        </button>
+                      </>
+                    )}
+                    {(user?.role === 'ADMIN' || (user?.role === 'MODERATOR' && user?.userId !== selectedContribution.userId)) && (
+                      <>
+                        <button className="btn btn-success btn-sm" onClick={() => handleModalAction(approveContribution, selectedContribution.id)} disabled={isSubmitting}>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {isSubmitting ? 'Approving...' : 'Approve'}
+                        </button>
+                        <button className="btn btn-error btn-sm" onClick={() => handleModalAction(rejectContribution, selectedContribution.id)} disabled={isSubmitting}>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {isSubmitting ? 'Rejecting...' : 'Reject'}
+                        </button>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Close button - right side */}
+              <button className="btn btn-outline btn-secondary" onClick={handleCloseDiff} disabled={isSubmitting}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Close
+              </button>
             </div>
           </div>
         </div>

@@ -51,7 +51,7 @@ const ContributeInfoPage = () => {
       <div className="flex gap-2">
         <Link to="/contributions/browse" className="btn btn-outline btn-primary">Browse Contributions</Link>
         {isAuthenticated ? (
-          <Link to="/dashboard" className="btn btn-primary">Submit a Contribution</Link>
+          <Link to="/contribute/vehicle" className="btn btn-primary">Submit a Contribution</Link>
         ) : (
           <Link to="/register" className="btn btn-primary">Create an Account</Link>
         )}

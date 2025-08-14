@@ -1,5 +1,5 @@
 import { useEffect, useState, useContext } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   fetchVehicles,
   createVehicle,
@@ -18,6 +18,7 @@ import DataTable, { Column } from '../components/DataTable';
 import { AuthContext } from '../context/AuthContext';
 
 const VehiclesPage = () => {
+  const navigate = useNavigate();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [pendingContributions, setPendingContributions] = useState<Contribution[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,15 +88,26 @@ const VehiclesPage = () => {
   };
 
   const handleProposeUpdate = (vehicle: Vehicle) => {
-    setContributeMode('UPDATE');
-    setCurrentVehicle(vehicle);
-    setShowModal(true);
+    // Navigate to multi-step form with update mode
+    // TODO: Pass vehicle data through URL params or state
+    navigate('/contribute/vehicle', {
+      state: {
+        mode: 'UPDATE',
+        vehicleData: vehicle,
+        targetVehicleId: vehicle.id
+      }
+    });
   };
 
   const handleProposeVariant = (vehicle: Vehicle) => {
-    setContributeMode('VARIANT');
-    setCurrentVehicle(vehicle);
-    setShowModal(true);
+    // Navigate to multi-step form with variant mode
+    navigate('/contribute/vehicle', {
+      state: {
+        mode: 'VARIANT',
+        vehicleData: vehicle,
+        isVariantMode: true
+      }
+    });
   };
 
   const handleSeedVehicles = async () => {
@@ -274,7 +286,7 @@ const VehiclesPage = () => {
           </>
         )}
         {token && (
-          <button className="btn btn-success" onClick={() => { setContributeMode('ADD'); setShowModal(true); setCurrentVehicle(null); }}>
+          <button className="btn btn-success" onClick={() => navigate('/contribute/vehicle')}>
             Propose New Vehicle
           </button>
         )}
