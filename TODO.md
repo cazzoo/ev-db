@@ -6,6 +6,10 @@
 [x] When running in dev mode, when admin, I would like to have a button to wipe all the vehicles. The same for proposals.
 [x] Unify the UI/UX, buttons, fields, vertical / horizontal alignment, grid components features.
 [x] I want to have a contribution form using https://daisyui.com/components/steps
-[] Create a new way of displaying vehicles, using cards and flex layout, so it looks better.
+[x] Create a new way of displaying vehicles, using cards and flex layout, so it looks better.
+[] Add image caption and alt text fields in the submission form (after image is selected).
+[] Add comment field when we want to reject a contribution (that can be seen in user's dashboard's contributions).
+[] Provide way to add custom fields to vehicles. The fields will be displayed into a specific step in the workflow form. We should have a way to retrieve all the available fields with the API. Sumitting a contribution with custom fields that's doesn't exist should work, we need to create the fields before. Custom fields can be administered by the admin, to rename it, determine if that is viewable from the vehicle card, vehicle details. The custom fields should be integrated the same way the other default fields (with live-edit in review, diff, ...etc.).
 [] Add a monetezation mechanism for the users to top-up their credit balance. Use wise business.
 [] Implement i18n
+[] Put in place TDD framework and feature tests to cover the application.

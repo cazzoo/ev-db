@@ -4,7 +4,7 @@ import { AutocompleteInput } from './AutocompleteInput';
 import { Form, Input, Textarea, Button } from '../design-system';
 
 interface MultiStepContributionFormProps {
-  onSubmit: (vehicleData: Vehicle, changeType: 'NEW' | 'UPDATE', targetVehicleId?: number) => void;
+  onSubmit: (vehicleData: Vehicle, changeType: 'NEW' | 'UPDATE', targetVehicleId?: number, images?: File[]) => void;
   onCancel: () => void;
   initialData?: Partial<Vehicle>;
   initialChangeType?: 'NEW' | 'UPDATE';
@@ -23,6 +23,7 @@ interface FormData {
   topSpeed: number;
   price: number;
   description: string;
+  images: File[];
 }
 
 interface StepValidation {
@@ -34,7 +35,8 @@ const STEPS = [
   { id: 1, title: 'Basic Info', description: 'Vehicle identification' },
   { id: 2, title: 'Performance', description: 'Technical specifications' },
   { id: 3, title: 'Details', description: 'Additional information' },
-  { id: 4, title: 'Review', description: 'Confirm submission' }
+  { id: 4, title: 'Images', description: 'Upload vehicle photos' },
+  { id: 5, title: 'Review', description: 'Confirm submission' }
 ];
 
 const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
@@ -56,7 +58,8 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
     acceleration: initialData?.acceleration || 0,
     topSpeed: initialData?.topSpeed || 0,
     price: initialData?.price || 0,
-    description: initialData?.description || ''
+    description: initialData?.description || '',
+    images: []
   });
 
   // Autocomplete and validation state
@@ -85,6 +88,24 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
     setFormData(prev => ({ ...prev, [field]: value }));
   }, []);
 
+  // Handle image uploads
+  const handleImageUpload = useCallback((files: FileList | null) => {
+    if (!files) return;
+
+    const newImages = Array.from(files).slice(0, 5 - formData.images.length); // Limit to 5 total
+    setFormData(prev => ({
+      ...prev,
+      images: [...prev.images, ...newImages]
+    }));
+  }, [formData.images.length]);
+
+  const removeImage = useCallback((index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }));
+  }, []);
+
   // Validate current step
   const validateStep = useCallback((step: number): StepValidation => {
     const errors: string[] = [];
@@ -106,6 +127,23 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
         if (formData.acceleration < 0) errors.push('Acceleration cannot be negative');
         if (formData.topSpeed < 0) errors.push('Top speed cannot be negative');
         if (formData.price < 0) errors.push('Price cannot be negative');
+        break;
+      case 4: // Images - optional but validate file types if provided
+        if (formData.images.length > 0) {
+          const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+          const maxSize = 10 * 1024 * 1024; // 10MB
+          for (const file of formData.images) {
+            if (!validTypes.includes(file.type)) {
+              errors.push(`${file.name}: Only JPEG, PNG, and WebP images are allowed`);
+            }
+            if (file.size > maxSize) {
+              errors.push(`${file.name}: File size must be less than 10MB`);
+            }
+          }
+          if (formData.images.length > 5) {
+            errors.push('Maximum 5 images allowed');
+          }
+        }
         break;
     }
 
@@ -192,7 +230,7 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
       description: formData.description || undefined
     };
 
-    onSubmit(vehicleData, changeType, targetVehicleId);
+    onSubmit(vehicleData, changeType, targetVehicleId, formData.images);
   }, [formData, changeType, targetVehicleId, onSubmit, validateStep, currentStep]);
 
   const currentValidation = validateStep(currentStep);
@@ -217,6 +255,47 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
             </li>
           ))}
         </ul>
+      </div>
+
+      {/* Navigation buttons - Fixed position after steps indicator */}
+      <div className="card bg-base-100 shadow-sm mb-4">
+        <div className="card-body py-3">
+          <div className="flex justify-between items-center">
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={onCancel}>
+                Cancel
+              </Button>
+              {currentStep > 1 && (
+                <Button variant="secondary" size="sm" onClick={prevStep}>
+                  Previous
+                </Button>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              {currentStep < STEPS.length ? (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={nextStep}
+                  disabled={!currentValidation.isValid}
+                >
+                  Next
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSubmit}
+                  disabled={!currentValidation.isValid || isCheckingDuplicate}
+                  loading={isCheckingDuplicate}
+                >
+                  {isCheckingDuplicate ? 'Checking...' : 'Submit'}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Update/Variant mode indicator */}
@@ -354,8 +433,99 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
               </>
             )}
 
-            {/* Step 4: Review */}
+            {/* Step 4: Images */}
             {currentStep === 4 && (
+              <>
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">Upload Vehicle Images</h3>
+                    <p className="text-sm text-base-content/60 mb-4">
+                      Add up to 5 high-quality images of the vehicle. Images will be reviewed before being published.
+                    </p>
+                  </div>
+
+                  {/* File upload area */}
+                  <div className="border-2 border-dashed border-base-300 rounded-lg p-6 text-center hover:border-primary transition-colors">
+                    <input
+                      type="file"
+                      id="image-upload"
+                      multiple
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={(e) => handleImageUpload(e.target.files)}
+                      className="hidden"
+                      disabled={formData.images.length >= 5}
+                    />
+                    <label
+                      htmlFor="image-upload"
+                      className={`cursor-pointer ${formData.images.length >= 5 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <div className="space-y-2">
+                        <svg className="mx-auto h-12 w-12 text-base-content/40" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                          <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        <div>
+                          <p className="text-sm font-medium">
+                            {formData.images.length >= 5 ? 'Maximum images reached' : 'Click to upload images'}
+                          </p>
+                          <p className="text-xs text-base-content/60">
+                            JPEG, PNG, WebP up to 10MB each
+                          </p>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Image previews */}
+                  {formData.images.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-medium">Selected Images ({formData.images.length}/5)</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {formData.images.map((file, index) => (
+                          <div key={index} className="relative group">
+                            <div className="aspect-video bg-base-200 rounded-lg overflow-hidden">
+                              <img
+                                src={URL.createObjectURL(file)}
+                                alt={`Preview ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeImage(index)}
+                              className="absolute -top-2 -right-2 btn btn-circle btn-xs btn-error opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Remove image"
+                            >
+                              ✕
+                            </button>
+                            <p className="text-xs text-center mt-1 truncate" title={file.name}>
+                              {file.name}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="alert alert-info">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-6 h-6">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div>
+                      <p className="font-medium">Image Guidelines</p>
+                      <ul className="text-sm mt-1 space-y-1">
+                        <li>• High-quality photos showing different angles of the vehicle</li>
+                        <li>• Clear, well-lit images without watermarks</li>
+                        <li>• Images will be reviewed by moderators before publication</li>
+                        <li>• You can skip this step and add images later</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Step 5: Review */}
+            {currentStep === 5 && (
               <div className="space-y-6">
                 <div className="alert alert-info">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-6 h-6">
@@ -425,6 +595,28 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {/* Images section */}
+                  <div className="card bg-base-200 md:col-span-2">
+                    <div className="card-body">
+                      <h3 className="card-title text-lg">Images ({formData.images.length})</h3>
+                      {formData.images.length > 0 ? (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                          {formData.images.map((file, index) => (
+                            <div key={index} className="aspect-video bg-base-300 rounded overflow-hidden">
+                              <img
+                                src={URL.createObjectURL(file)}
+                                alt={`Preview ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-base-content/60">No images selected</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -446,42 +638,6 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
             )}
           </Form>
 
-          {/* Navigation buttons */}
-          <div className="card-actions justify-between mt-4">
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={onCancel}>
-                Cancel
-              </Button>
-              {currentStep > 1 && (
-                <Button variant="secondary" size="sm" onClick={prevStep}>
-                  Previous
-                </Button>
-              )}
-            </div>
-
-            <div className="flex gap-2">
-              {currentStep < STEPS.length ? (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={nextStep}
-                  disabled={!currentValidation.isValid}
-                >
-                  Next
-                </Button>
-              ) : (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handleSubmit}
-                  disabled={!currentValidation.isValid || isCheckingDuplicate}
-                  loading={isCheckingDuplicate}
-                >
-                  {isCheckingDuplicate ? 'Checking...' : 'Submit'}
-                </Button>
-              )}
-            </div>
-          </div>
         </div>
       </div>
     </div>

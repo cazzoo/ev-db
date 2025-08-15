@@ -9,12 +9,14 @@ import vehiclesRouter from './vehicles'
 import contributionsRouter from './contributions'
 import seedRouter from './seed'
 import adminRouter from './admin'
+import { imagesRouter } from './images'
 import { jwt } from 'hono/jwt'
 import { cors } from 'hono/cors'
 import { count, eq, sql, and, isNotNull } from 'drizzle-orm'
 import crypto from 'crypto'
 import { apiKeyAuth } from './middleware/apiKeyAuth'
 import { rateLimitMiddleware, getRateLimitStatus } from './middleware/rateLimiting'
+import { serveStatic } from '@hono/node-server/serve-static'
 
 // Simple migration function to add avatar_url column if it doesn't exist
 const runMigrations = async () => {
@@ -39,6 +41,7 @@ const runMigrations = async () => {
 }
 
 const app = new Hono().basePath('/api')
+const staticApp = new Hono() // Separate app for static files without /api prefix
 // Safety: ensure required tables exist (idempotent CREATE IF NOT EXISTS)
 const ensureApiTables = async () => {
   // api_keys
@@ -182,10 +185,43 @@ app.get('/test', apiKeyAuth, rateLimitMiddleware, async (c) => {
   });
 });
 
+// Serve static files from uploads directory (on staticApp without /api prefix)
+staticApp.get('/uploads/*', async (c) => {
+  const requestPath = c.req.path;
+  const filePath = requestPath.replace('/uploads/', '');
+  console.log(`📁 Static file request: ${requestPath} -> ${filePath}`);
+
+  const fs = await import('fs/promises');
+  const path = await import('path');
+
+  try {
+    const fullPath = path.join(process.cwd(), 'uploads', filePath);
+    console.log(`   Full path: ${fullPath}`);
+
+    const file = await fs.readFile(fullPath);
+    console.log(`   ✅ File read successfully (${file.length} bytes)`);
+
+    // Set proper content type based on file extension
+    const ext = path.extname(filePath).toLowerCase();
+    let contentType = 'application/octet-stream';
+    if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+    else if (ext === '.png') contentType = 'image/png';
+    else if (ext === '.webp') contentType = 'image/webp';
+
+    c.header('Content-Type', contentType);
+    c.header('Cache-Control', 'public, max-age=31536000');
+    return c.body(file);
+  } catch (error) {
+    console.log(`   ❌ File error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return c.notFound();
+  }
+})
+
 app.route('/auth', auth)
 app.route('/vehicles', vehiclesRouter)
 app.route('/contributions', contributionsRouter)
 app.route('/admin', adminRouter)
+app.route('/images', imagesRouter)
 
 // API keys routes - hybrid authentication (JWT for frontend, API key for external)
 const hybridAuth = async (c: Context, next: Next) => {
@@ -462,8 +498,14 @@ const startServer = async () => {
 
   try {
     console.log('About to call serve function...')
+
+    // Create a combined app that handles both API routes and static files
+    const combinedApp = new Hono()
+    combinedApp.route('/', staticApp) // Static files at root level
+    combinedApp.route('/', app) // API routes with /api prefix
+
     const server = serve({
-      fetch: app.fetch,
+      fetch: combinedApp.fetch,
       port,
       hostname: 'localhost'
     })

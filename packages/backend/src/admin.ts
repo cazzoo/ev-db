@@ -1,9 +1,11 @@
 import { Hono } from 'hono';
 import { db } from './db';
-import { users, vehicles, contributions, contributionReviews } from './db/schema';
+import { users, vehicles, contributions, contributionReviews, imageContributions } from './db/schema';
 import { eq, like, or, count, desc, asc, sql, and, isNotNull } from 'drizzle-orm';
 import { adminAuth } from './middleware/adminAuth';
 import bcrypt from 'bcryptjs';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 const adminRouter = new Hono();
 
@@ -439,12 +441,46 @@ adminRouter.delete('/dev/wipe-vehicles', async (c) => {
   }
 
   try {
-    // Delete all vehicles
+    console.log('🗑️ Starting vehicle wipe process...');
+
+    // First, get all image contributions to clean up files
+    const allImageContribs = await db.select().from(imageContributions);
+    console.log(`   📁 Found ${allImageContribs.length} image files to clean up`);
+
+    // Clean up physical image files
+    let filesDeleted = 0;
+    for (const image of allImageContribs) {
+      try {
+        const filePath = path.join(process.cwd(), 'uploads', image.path);
+        await fs.unlink(filePath);
+        filesDeleted++;
+      } catch (fileError) {
+        console.warn(`   ⚠️ Could not delete file ${image.path}:`, fileError);
+        // Continue even if file deletion fails
+      }
+    }
+    console.log(`   🗂️ Deleted ${filesDeleted} physical image files`);
+
+    // Delete all image contributions (they reference vehicles)
+    const deletedImageContribs = await db.delete(imageContributions).returning({ id: imageContributions.id });
+    console.log(`   ✅ Deleted ${deletedImageContribs.length} image contribution records`);
+
+    // Then, delete all contributions (they may reference vehicles via targetVehicleId)
+    const deletedContribs = await db.delete(contributions).returning({ id: contributions.id });
+    console.log(`   ✅ Deleted ${deletedContribs.length} contributions`);
+
+    // Finally, delete all vehicles (vehicleImages will cascade automatically)
     const deletedVehicles = await db.delete(vehicles).returning({ id: vehicles.id });
+    console.log(`   ✅ Deleted ${deletedVehicles.length} vehicles`);
 
     return c.json({
-      message: `Successfully wiped ${deletedVehicles.length} vehicles`,
-      deletedCount: deletedVehicles.length
+      message: `Successfully wiped ${deletedVehicles.length} vehicles, ${deletedContribs.length} contributions, ${deletedImageContribs.length} image contributions, and ${filesDeleted} image files`,
+      deletedCounts: {
+        vehicles: deletedVehicles.length,
+        contributions: deletedContribs.length,
+        imageContributions: deletedImageContribs.length,
+        imageFiles: filesDeleted
+      }
     });
   } catch (error) {
     console.error('Error wiping vehicles:', error);
@@ -465,16 +501,46 @@ adminRouter.delete('/dev/wipe-contributions', async (c) => {
   }
 
   try {
-    // First delete all contribution reviews to avoid foreign key constraint
-    const deletedReviews = await db.delete(contributionReviews).returning({ id: contributionReviews.id });
+    console.log('🗑️ Starting contributions wipe process...');
 
-    // Then delete all contributions
+    // First, get all image contributions to clean up files
+    const allImageContribs = await db.select().from(imageContributions);
+    console.log(`   📁 Found ${allImageContribs.length} image files to clean up`);
+
+    // Clean up physical image files
+    let filesDeleted = 0;
+    for (const image of allImageContribs) {
+      try {
+        const filePath = path.join(process.cwd(), 'uploads', image.path);
+        await fs.unlink(filePath);
+        filesDeleted++;
+      } catch (fileError) {
+        console.warn(`   ⚠️ Could not delete file ${image.path}:`, fileError);
+        // Continue even if file deletion fails
+      }
+    }
+    console.log(`   🗂️ Deleted ${filesDeleted} physical image files`);
+
+    // Delete all image contributions (they reference contributions)
+    const deletedImageContribs = await db.delete(imageContributions).returning({ id: imageContributions.id });
+    console.log(`   ✅ Deleted ${deletedImageContribs.length} image contribution records`);
+
+    // Delete all contribution reviews to avoid foreign key constraint
+    const deletedReviews = await db.delete(contributionReviews).returning({ id: contributionReviews.id });
+    console.log(`   ✅ Deleted ${deletedReviews.length} contribution reviews`);
+
+    // Finally delete all contributions
     const deletedContributions = await db.delete(contributions).returning({ id: contributions.id });
+    console.log(`   ✅ Deleted ${deletedContributions.length} contributions`);
 
     return c.json({
-      message: `Successfully wiped ${deletedContributions.length} contributions and ${deletedReviews.length} reviews`,
-      deletedCount: deletedContributions.length,
-      deletedReviewsCount: deletedReviews.length
+      message: `Successfully wiped ${deletedContributions.length} contributions, ${deletedReviews.length} reviews, ${deletedImageContribs.length} image contributions, and ${filesDeleted} image files`,
+      deletedCounts: {
+        contributions: deletedContributions.length,
+        reviews: deletedReviews.length,
+        imageContributions: deletedImageContribs.length,
+        imageFiles: filesDeleted
+      }
     });
   } catch (error) {
     console.error('Error wiping contributions:', error);

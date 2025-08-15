@@ -1,12 +1,17 @@
 import { Hono } from 'hono';
 import { db, sqlClient } from './db';
-import { contributions, users, contributionReviews, vehicles } from './db/schema';
+import { contributions, users, contributionReviews, vehicles, imageContributions, vehicleImages } from './db/schema';
 import { eq, and, count, sql } from 'drizzle-orm';
 import { jwt } from 'hono/jwt';
 import { apiKeyAuth } from './middleware/apiKeyAuth';
 import { moderatorAuth } from './middleware/adminAuth';
 import { rateLimitMiddleware } from './middleware/rateLimiting';
 import { checkForDuplicate, deductContributionCredit, VehicleData } from './services/vehicleDuplicateService';
+import { promises as fs } from 'fs';
+import path from 'path';
+
+// Base URL for serving images - can be configured via environment variable
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 
 const contributionsRouter = new Hono();
 
@@ -295,6 +300,8 @@ contributionsRouter.post('/:id/approve', userAuth, async (c) => {
     }
 
     const vehicleData = contribution.vehicleData as any; // Type assertion for JSON data
+    let finalVehicleId: number;
+
     if ((contribution as any).changeType === 'UPDATE' && (contribution as any).targetVehicleId) {
       // Validate that target vehicle still exists before updating
       const [targetVehicle] = await db.select().from(vehicles).where(eq(vehicles.id, (contribution as any).targetVehicleId as number)).limit(1);
@@ -304,18 +311,109 @@ contributionsRouter.post('/:id/approve', userAuth, async (c) => {
 
       // Update existing vehicle
       await db.update(vehicles).set(vehicleData).where(eq(vehicles.id, (contribution as any).targetVehicleId as number));
+      finalVehicleId = (contribution as any).targetVehicleId as number;
     } else {
-      // Insert new vehicle
-      await db.insert(vehicles).values(vehicleData);
+      // Insert new vehicle and get the ID
+      const [newVehicle] = await db.insert(vehicles).values(vehicleData).returning({ id: vehicles.id });
+      finalVehicleId = newVehicle.id;
     }
 
     // Update contribution status
     await db.update(contributions).set({ status: 'APPROVED', approvedAt: new Date() }).where(eq(contributions.id, contributionId));
 
+    // Approve associated image contributions
+    const associatedImages = await db
+      .select()
+      .from(imageContributions)
+      .where(eq(imageContributions.contributionId, contributionId));
+
+    console.log(`✅ Found ${associatedImages.length} associated images to approve for contribution ${contributionId}`);
+
+    // Move images from temp to permanent location and approve them
+    for (const image of associatedImages) {
+      try {
+        // Move file from temp to permanent location
+        const tempPath = path.join(process.cwd(), 'uploads', image.path);
+        const permanentRelativePath = image.path.replace('temp/', 'vehicles/');
+        const permanentPath = path.join(process.cwd(), 'uploads', permanentRelativePath);
+
+        // Ensure vehicles directory exists
+        await fs.mkdir(path.dirname(permanentPath), { recursive: true });
+
+        // Move the file
+        await fs.rename(tempPath, permanentPath);
+        console.log(`   📁 Moved ${image.path} to ${permanentRelativePath}`);
+
+        // Use the final vehicle ID (either updated existing or newly created)
+        const targetVehicleId = finalVehicleId;
+
+        // Get the next display order for this vehicle
+        const existingImages = await db
+          .select({ displayOrder: vehicleImages.displayOrder })
+          .from(vehicleImages)
+          .where(eq(vehicleImages.vehicleId, targetVehicleId))
+          .orderBy(sql`display_order DESC`)
+          .limit(1);
+
+        const nextDisplayOrder = existingImages.length > 0 ? existingImages[0].displayOrder + 1 : 0;
+
+        // Create a new record in vehicle_images table
+        await db.insert(vehicleImages).values({
+          vehicleId: targetVehicleId,
+          filename: image.filename,
+          path: permanentRelativePath,
+          url: `${BASE_URL}/uploads/${permanentRelativePath}`,
+          altText: image.altText,
+          caption: image.caption,
+          displayOrder: nextDisplayOrder,
+          fileSize: image.fileSize,
+          mimeType: image.mimeType,
+          width: image.width,
+          height: image.height,
+          uploadedBy: image.userId,
+          uploadedAt: new Date(),
+          isApproved: true,
+          approvedBy: payload.userId, // The admin/moderator who approved it
+          approvedAt: new Date()
+        });
+
+        console.log(`   ✅ Created vehicle_images record for vehicle ${targetVehicleId} with display order ${nextDisplayOrder}`);
+
+        // Update image contribution status to APPROVED (keep for audit trail)
+        await db
+          .update(imageContributions)
+          .set({
+            status: 'APPROVED',
+            reviewedBy: payload.userId,
+            reviewedAt: new Date(),
+            path: permanentRelativePath // Update to permanent path
+          })
+          .where(eq(imageContributions.id, image.id));
+      } catch (fileError) {
+        console.error(`   ❌ Error processing image ${image.path}:`, fileError);
+        // Mark image as rejected if file operations fail
+        await db
+          .update(imageContributions)
+          .set({
+            status: 'REJECTED',
+            reviewedAt: new Date(),
+            rejectionReason: 'File processing error during approval'
+          })
+          .where(eq(imageContributions.id, image.id));
+      }
+    }
+
     // Award app currency to the contributor
     await db.update(users).set({ appCurrencyBalance: sql`app_currency_balance + 10` }).where(eq(users.id, contribution.userId)); // Award 10 credits
 
-    return c.json({ message: 'Contribution approved successfully' }, 200);
+    const imageApprovalMessage = associatedImages.length > 0
+      ? ` and ${associatedImages.length} associated image(s) approved`
+      : '';
+
+    return c.json({
+      message: `Contribution approved successfully${imageApprovalMessage}`,
+      imagesApproved: associatedImages.length
+    }, 200);
   } catch (error) {
     console.error('Error approving contribution:', error);
     return c.json({ error: 'Internal server error' }, 500);
@@ -346,10 +444,48 @@ contributionsRouter.post('/:id/reject', userAuth, async (c) => {
       return c.json({ error: 'Contribution is not pending' }, 400);
     }
 
+    // Find and clean up associated image contributions
+    const associatedImages = await db
+      .select()
+      .from(imageContributions)
+      .where(eq(imageContributions.contributionId, contributionId));
+
+    console.log(`🗑️ Found ${associatedImages.length} associated images to clean up for contribution ${contributionId}`);
+
+    // Delete image files and update their status
+    for (const image of associatedImages) {
+      try {
+        // Delete the physical file
+        const filePath = path.join(process.cwd(), 'uploads', image.path);
+        await fs.unlink(filePath);
+        console.log(`   ✅ Deleted file: ${image.path}`);
+      } catch (fileError) {
+        console.warn(`   ⚠️ Could not delete file ${image.path}:`, fileError);
+        // Continue even if file deletion fails
+      }
+
+      // Update image contribution status to REJECTED
+      await db
+        .update(imageContributions)
+        .set({
+          status: 'REJECTED',
+          reviewedAt: new Date(),
+          rejectionReason: 'Associated vehicle contribution was rejected'
+        })
+        .where(eq(imageContributions.id, image.id));
+    }
+
     // Update contribution status
     await db.update(contributions).set({ status: 'REJECTED', rejectedAt: new Date() }).where(eq(contributions.id, contributionId));
 
-    return c.json({ message: 'Contribution rejected successfully' }, 200);
+    const imageCleanupMessage = associatedImages.length > 0
+      ? ` and ${associatedImages.length} associated image(s) cleaned up`
+      : '';
+
+    return c.json({
+      message: `Contribution rejected successfully${imageCleanupMessage}`,
+      imagesCleanedUp: associatedImages.length
+    }, 200);
   } catch (error) {
     console.error('Error rejecting contribution:', error);
     return c.json({ error: 'Internal server error' }, 500);
@@ -378,12 +514,50 @@ contributionsRouter.post('/:id/cancel', userAuth, async (c) => {
       return c.json({ error: 'Only pending contributions can be canceled' }, 400);
     }
 
+    // Find and clean up associated image contributions
+    const associatedImages = await db
+      .select()
+      .from(imageContributions)
+      .where(eq(imageContributions.contributionId, contributionId));
+
+    console.log(`🗑️ Found ${associatedImages.length} associated images to clean up for cancelled contribution ${contributionId}`);
+
+    // Delete image files and update their status
+    for (const image of associatedImages) {
+      try {
+        // Delete the physical file
+        const filePath = path.join(process.cwd(), 'uploads', image.path);
+        await fs.unlink(filePath);
+        console.log(`   ✅ Deleted file: ${image.path}`);
+      } catch (fileError) {
+        console.warn(`   ⚠️ Could not delete file ${image.path}:`, fileError);
+        // Continue even if file deletion fails
+      }
+
+      // Update image contribution status to CANCELLED
+      await db
+        .update(imageContributions)
+        .set({
+          status: 'CANCELLED',
+          reviewedAt: new Date(),
+          rejectionReason: 'Associated vehicle contribution was cancelled'
+        })
+        .where(eq(imageContributions.id, image.id));
+    }
+
     // Update contribution status to CANCELLED with cancelledAt timestamp
     await db.update(contributions)
       .set({ status: 'CANCELLED', cancelledAt: new Date() })
       .where(eq(contributions.id, contributionId));
 
-    return c.json({ message: 'Contribution cancelled successfully' }, 200);
+    const imageCleanupMessage = associatedImages.length > 0
+      ? ` and ${associatedImages.length} associated image(s) cleaned up`
+      : '';
+
+    return c.json({
+      message: `Contribution cancelled successfully${imageCleanupMessage}`,
+      imagesCleanedUp: associatedImages.length
+    }, 200);
   } catch (error) {
     console.error('Error cancelling contribution:', error);
     return c.json({ error: 'Internal server error' }, 500);

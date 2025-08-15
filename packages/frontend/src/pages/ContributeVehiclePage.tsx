@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { Vehicle, submitContribution } from '../services/api';
+import { Vehicle, submitContribution, submitImageContribution } from '../services/api';
 import MultiStepContributionForm from '../components/MultiStepContributionForm';
 
 interface LocationState {
@@ -33,13 +33,47 @@ const ContributeVehiclePage: React.FC = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleSubmit = async (vehicleData: Vehicle, changeType: 'NEW' | 'UPDATE', targetVehicleId?: number) => {
+  const handleSubmit = async (vehicleData: Vehicle, changeType: 'NEW' | 'UPDATE', targetVehicleId?: number, images?: File[]) => {
     setIsSubmitting(true);
     try {
-      await submitContribution(vehicleData, changeType, targetVehicleId);
+      // First submit the vehicle contribution
+      const contribution = await submitContribution(vehicleData, changeType, targetVehicleId);
 
-      showToast('Contribution submitted successfully! It will be reviewed by moderators.', 'success');
-      navigate('/dashboard');
+      // If images were provided, submit them as image contributions
+      if (images && images.length > 0) {
+        console.log(`Submitting ${images.length} images for contribution ${contribution.id}`);
+
+        // Submit each image as an image contribution
+        const imageSubmissions = images.map(async (image) => {
+          try {
+            // Use the target vehicle ID for the image contribution
+            const vehicleIdForImage = targetVehicleId || contribution.vehicleData.id;
+            if (!vehicleIdForImage) {
+              throw new Error('No vehicle ID available for image submission');
+            }
+
+            return await submitImageContribution(vehicleIdForImage, image, contribution.id);
+          } catch (error) {
+            console.error('Error submitting image:', error);
+            throw error;
+          }
+        });
+
+        // Wait for all image submissions to complete
+        await Promise.all(imageSubmissions);
+
+        showToast(`Contribution submitted with ${images.length} image(s)! Everything will be reviewed by moderators.`, 'success');
+      } else {
+        showToast('Contribution submitted successfully! It will be reviewed by moderators.', 'success');
+      }
+
+      // Redirect to the contributions page with the review modal open for the new contribution
+      navigate('/contributions/browse', {
+        state: {
+          openContributionId: contribution.id,
+          showSuccessMessage: true
+        }
+      });
     } catch (error: any) {
       console.error('Failed to submit contribution:', error);
 
@@ -57,7 +91,9 @@ const ContributeVehiclePage: React.FC = () => {
   };
 
   const handleCancel = () => {
-    navigate('/contribute');
+    // Navigate back to where the user came from, or default to /contribute
+    const returnTo = location.state?.returnTo || '/contribute';
+    navigate(returnTo);
   };
 
   if (!isAuthenticated) {

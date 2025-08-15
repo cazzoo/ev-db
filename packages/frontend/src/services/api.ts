@@ -70,6 +70,26 @@ export const getCurrentUser = async () => {
   return data;
 };
 
+export interface VehicleImage {
+  id: number;
+  vehicleId: number;
+  filename: string;
+  path: string;
+  url: string;
+  altText?: string;
+  caption?: string;
+  displayOrder: number;
+  fileSize?: number;
+  mimeType?: string;
+  width?: number;
+  height?: number;
+  uploadedBy?: number;
+  uploadedAt: Date;
+  isApproved: boolean;
+  approvedBy?: number;
+  approvedAt?: Date;
+}
+
 export interface Vehicle {
   id?: number;
   make: string;
@@ -82,6 +102,7 @@ export interface Vehicle {
   topSpeed?: number;
   price?: number;
   description?: string;
+  images?: VehicleImage[];
 }
 
 export const fetchVehicleSuggestions = async (): Promise<VehicleSuggestions> => {
@@ -750,6 +771,159 @@ export const cleanupOrphanedContributions = async (): Promise<{ message: string;
   if (!response.ok) {
     const data = await response.json();
     throw new Error(data.error || 'Failed to cleanup orphaned contributions');
+  }
+  return response.json();
+};
+
+// Image-related API functions
+
+export const fetchVehicleImages = async (vehicleId: number): Promise<VehicleImage[]> => {
+  const response = await fetch(`${API_URL}/images/vehicle/${vehicleId}`, {
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch vehicle images');
+  }
+  return response.json();
+};
+
+export const submitImageContribution = async (
+  vehicleId: number,
+  imageFile: File,
+  contributionId?: number,
+  altText?: string,
+  caption?: string
+): Promise<{ message: string; contributionId: number }> => {
+  const formData = new FormData();
+  formData.append('image', imageFile);
+  formData.append('vehicleId', vehicleId.toString());
+  if (contributionId) formData.append('contributionId', contributionId.toString());
+  if (altText) formData.append('altText', altText);
+  if (caption) formData.append('caption', caption);
+
+  const response = await fetch(`${API_URL}/images/contribute`, {
+    method: 'POST',
+    headers: {
+      ...getAuthHeaders(),
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || 'Failed to submit image');
+  }
+  return response.json();
+};
+
+export interface ImageContribution {
+  id: number;
+  userId: number;
+  vehicleId: number;
+  contributionId?: number;
+  filename: string;
+  originalFilename: string;
+  path: string;
+  altText?: string;
+  caption?: string;
+  fileSize?: number;
+  mimeType?: string;
+  width?: number;
+  height?: number;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  submittedAt: Date;
+  reviewedBy?: number;
+  reviewedAt?: Date;
+  rejectionReason?: string;
+}
+
+export const fetchPendingImageContributions = async (): Promise<ImageContribution[]> => {
+  const response = await fetch(`${API_URL}/images/contributions/pending`, {
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch pending image contributions');
+  }
+  return response.json();
+};
+
+export const approveImageContribution = async (
+  contributionId: number,
+  displayOrder?: number
+): Promise<{ message: string; image: VehicleImage }> => {
+  const response = await fetch(`${API_URL}/images/contributions/${contributionId}/approve`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ displayOrder }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || 'Failed to approve image');
+  }
+  return response.json();
+};
+
+export const rejectImageContribution = async (
+  contributionId: number,
+  reason?: string
+): Promise<{ message: string }> => {
+  const response = await fetch(`${API_URL}/images/contributions/${contributionId}/reject`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ reason }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || 'Failed to reject image');
+  }
+  return response.json();
+};
+
+export const deleteVehicleImage = async (imageId: number): Promise<{ message: string }> => {
+  const response = await fetch(`${API_URL}/images/${imageId}`, {
+    method: 'DELETE',
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || 'Failed to delete image');
+  }
+  return response.json();
+};
+
+export const updateImageOrder = async (
+  vehicleId: number,
+  imageOrders: { id: number; order: number }[]
+): Promise<{ message: string }> => {
+  const response = await fetch(`${API_URL}/images/vehicle/${vehicleId}/order`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ imageOrders }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || 'Failed to update image order');
   }
   return response.json();
 };

@@ -7,6 +7,7 @@ import { apiKeyAuth } from './middleware/apiKeyAuth';
 import { adminAuth } from './middleware/adminAuth';
 import { rateLimitMiddleware } from './middleware/rateLimiting';
 import { getVehicleSuggestions, getModelsForMake } from './services/vehicleSuggestionsService';
+import { getVehicleImages, getImagesForVehicles } from './services/imageService';
 
 const vehiclesRouter = new Hono();
 
@@ -28,13 +29,24 @@ vehiclesRouter.get('/suggestions/models/:make', async (c) => {
   return c.json({ models });
 });
 
-// Get all vehicles - now secured with API key
+// Get all vehicles with images - now secured with API key
 vehiclesRouter.get('/', async (c) => {
   const allVehicles = await db.select().from(vehicles);
-  return c.json(allVehicles);
+
+  // Get images for all vehicles efficiently
+  const vehicleIds = allVehicles.map(v => v.id);
+  const imagesByVehicle = await getImagesForVehicles(vehicleIds);
+
+  // Combine vehicles with their images
+  const vehiclesWithImages = allVehicles.map(vehicle => ({
+    ...vehicle,
+    images: imagesByVehicle[vehicle.id] || []
+  }));
+
+  return c.json(vehiclesWithImages);
 });
 
-// Get a single vehicle by ID - now secured with API key
+// Get a single vehicle by ID with images - now secured with API key
 vehiclesRouter.get('/:id', async (c) => {
   const id = Number(c.req.param('id'));
   if (isNaN(id)) {
@@ -47,7 +59,13 @@ vehiclesRouter.get('/:id', async (c) => {
     return c.json({ error: 'Vehicle not found' }, 404);
   }
 
-  return c.json(vehicle[0]);
+  // Get images for this vehicle
+  const images = await getVehicleImages(id);
+
+  return c.json({
+    ...vehicle[0],
+    images
+  });
 });
 
 // Create a new vehicle (Admin only) - requires both API key and admin role

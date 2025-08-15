@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import DataTable, { Column } from '../components/DataTable';
+import VehicleImageCarousel from '../components/VehicleImageCarousel';
 import {
   fetchPendingContributions,
   fetchAllContributions,
@@ -10,8 +11,10 @@ import {
   rejectContribution,
   cancelMyContribution,
   updateMyContribution,
+  fetchPendingImageContributions,
   Contribution,
   Vehicle,
+  ImageContribution,
   fetchVehicles,
 } from '../services/api';
 
@@ -134,7 +137,8 @@ const InlineEditableVehicleDetails = ({
   isEditMode = false,
   getDraftValue,
   isFieldModified,
-  updateDraftField
+  updateDraftField,
+  imageContributions = []
 }: {
   contribution: Contribution;
   original: Vehicle | null;
@@ -143,6 +147,7 @@ const InlineEditableVehicleDetails = ({
   getDraftValue: (contributionId: number, fieldName: string, originalValue: string | number | undefined) => string | number | undefined;
   isFieldModified: (contributionId: number, fieldName: string) => boolean;
   updateDraftField: (contributionId: number, fieldName: string, value: string | number | undefined) => void;
+  imageContributions?: ImageContribution[];
 }) => {
   const vehicleData = contribution.vehicleData;
   const isVariant = contribution.changeType === 'NEW';
@@ -172,6 +177,51 @@ const InlineEditableVehicleDetails = ({
             </div>
           </div>
         </div>
+
+        {/* Images section for variant proposals */}
+        {imageContributions.length > 0 && (
+          <div className="card bg-base-100 shadow-sm">
+            <div className="card-body">
+              <h5 className="card-title text-lg mb-4">Proposed Images ({imageContributions.length})</h5>
+              <div className="h-48 bg-base-200 rounded-lg overflow-hidden mb-4">
+                <VehicleImageCarousel
+                  images={imageContributions.map(img => ({
+                    id: img.id,
+                    url: `http://localhost:3000/uploads/${img.path}`,
+                    altText: img.altText,
+                    caption: img.caption
+                  }))}
+                  vehicleMake={vehicleData.make}
+                  vehicleModel={vehicleData.model}
+                  vehicleYear={vehicleData.year}
+                  className="w-full h-full"
+                  showIndicators={true}
+                  showNavigation={true}
+                  autoPlay={false}
+                />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {imageContributions.map((img, index) => (
+                  <div key={img.id} className="text-center">
+                    <div className="aspect-video bg-base-300 rounded overflow-hidden mb-1">
+                      <img
+                        src={`http://localhost:3000/uploads/${img.path}`}
+                        alt={img.altText || `Image ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <p className="text-xs text-base-content/60 truncate" title={img.originalFilename}>
+                      {img.originalFilename}
+                    </p>
+                    <div className={`badge badge-sm ${img.status === 'PENDING' ? 'badge-warning' : img.status === 'APPROVED' ? 'badge-success' : 'badge-error'}`}>
+                      {img.status}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -273,6 +323,84 @@ const InlineEditableVehicleDetails = ({
           </div>
         </div>
       </div>
+
+      {/* Images section for updates/variants */}
+      {imageContributions.length > 0 && (
+        <div className="card bg-base-100 shadow-sm">
+          <div className="card-body">
+            <h5 className="card-title text-lg mb-4">
+              Proposed Images ({imageContributions.length})
+              <div className="badge badge-info badge-sm ml-2">Pending Review</div>
+            </h5>
+
+            {/* Main carousel view */}
+            <div className="h-48 bg-base-200 rounded-lg overflow-hidden mb-4">
+              <VehicleImageCarousel
+                images={imageContributions.map(img => ({
+                  id: img.id,
+                  url: `http://localhost:3000/uploads/${img.path}`,
+                  altText: img.altText,
+                  caption: img.caption
+                }))}
+                vehicleMake={vehicleData.make}
+                vehicleModel={vehicleData.model}
+                vehicleYear={vehicleData.year}
+                className="w-full h-full"
+                showIndicators={true}
+                showNavigation={true}
+                autoPlay={false}
+              />
+            </div>
+
+            {/* Thumbnail grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {imageContributions.map((img, index) => (
+                <div key={img.id} className="text-center">
+                  <div className="aspect-video bg-base-300 rounded overflow-hidden mb-2">
+                    <img
+                      src={`http://localhost:3000/uploads/${img.path}`}
+                      alt={img.altText || `Image ${index + 1}`}
+                      className="w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer"
+                      title={img.altText || `Image ${index + 1}`}
+                    />
+                  </div>
+                  <p className="text-xs text-base-content/70 truncate mb-1" title={img.originalFilename}>
+                    {img.originalFilename}
+                  </p>
+                  <div className="flex justify-center gap-1">
+                    <div className={`badge badge-xs ${
+                      img.status === 'PENDING' ? 'badge-warning' :
+                      img.status === 'APPROVED' ? 'badge-success' :
+                      'badge-error'
+                    }`}>
+                      {img.status}
+                    </div>
+                    {img.fileSize && (
+                      <div className="badge badge-xs badge-ghost">
+                        {(img.fileSize / 1024 / 1024).toFixed(1)}MB
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Image contribution info */}
+            <div className="alert alert-info mt-4">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-6 h-6">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <div>
+                <p className="font-medium">Image Contributions</p>
+                <p className="text-sm">
+                  These images were submitted along with this vehicle contribution and are pending review.
+                  They will be added to the vehicle if both the vehicle data and images are approved.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -291,6 +419,8 @@ const BrowseContributionsPage = () => {
   const [originalVehicle, setOriginalVehicle] = useState<Vehicle | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [imageContributions, setImageContributions] = useState<ImageContribution[]>([]);
+  const [isNewlySubmitted, setIsNewlySubmitted] = useState(false);
 
   // New state for multi-proposal navigation
   const [relatedProposals, setRelatedProposals] = useState<Contribution[]>([]);
@@ -382,8 +512,78 @@ const BrowseContributionsPage = () => {
     const referenceVehicle = findReferenceVehicle(contribution, vehicles);
     setOriginalVehicle(referenceVehicle);
 
+    // Fetch image contributions for this vehicle
+    loadImageContributions(contribution);
+
     setShowDiffModal(true);
   }, [allContributions]);
+
+  // Function to load image contributions for a specific contribution
+  const loadImageContributions = useCallback(async (contribution: Contribution) => {
+    try {
+      console.log('🔍 Loading image contributions for contribution:', contribution.id);
+      console.log('   - Change type:', contribution.changeType);
+      console.log('   - Target vehicle ID:', contribution.targetVehicleId);
+      console.log('   - Vehicle data ID:', contribution.vehicleData?.id);
+
+      // For now, fetch all pending image contributions and filter by vehicle
+      // In a full implementation, you'd want a specific API endpoint for this
+      const allImageContribs = await fetchPendingImageContributions();
+      console.log('📸 Fetched all image contributions:', allImageContribs.length);
+
+      // Filter image contributions by contribution ID (more accurate than vehicle ID)
+      console.log('🎯 Looking for images linked to contribution ID:', contribution.id);
+
+      const relevantImages = allImageContribs.filter(img => {
+        // First try to match by contribution ID (new linking method)
+        if (img.contributionId === contribution.id) {
+          console.log(`   - Image ${img.id} (contribution ${img.contributionId}): ✅ DIRECT MATCH`);
+          return true;
+        }
+
+        // Fallback to vehicle ID matching for older images without contribution linking
+        const vehicleId = contribution.targetVehicleId || contribution.vehicleData.id;
+        const matches = img.vehicleId === vehicleId || (img.vehicleId === contribution.vehicleData.id);
+        if (matches && !img.contributionId) {
+          console.log(`   - Image ${img.id} (vehicle ${img.vehicleId}, no contribution link): ⚠️ FALLBACK MATCH`);
+          return true;
+        }
+
+        console.log(`   - Image ${img.id}: ❌ no match`);
+        return false;
+      });
+
+      console.log('🖼️ Found relevant images:', relevantImages.length);
+      setImageContributions(relevantImages);
+    } catch (error) {
+      console.error('Failed to load image contributions:', error);
+      setImageContributions([]);
+    }
+  }, []);
+
+  // Debug effect to track imageContributions changes
+  useEffect(() => {
+    console.log('🖼️ Image contributions state updated:', imageContributions.length);
+    imageContributions.forEach((img, index) => {
+      console.log(`   ${index + 1}. ${img.originalFilename} (ID: ${img.id}, Vehicle: ${img.vehicleId})`);
+    });
+  }, [imageContributions]);
+
+  // Auto-open modal for newly submitted contribution
+  useEffect(() => {
+    const state = location.state as { openContributionId?: number; showSuccessMessage?: boolean };
+    if (state?.openContributionId && allContributions.length > 0 && allVehicles.length > 0) {
+      const contributionToOpen = allContributions.find(c => c.id === state.openContributionId);
+      if (contributionToOpen) {
+        console.log('🎯 Auto-opening modal for contribution:', state.openContributionId);
+        setIsNewlySubmitted(state.showSuccessMessage || false);
+        handleShowDiff(contributionToOpen, allVehicles, allContributions);
+
+        // Clear the state to prevent re-opening on subsequent renders
+        window.history.replaceState({}, '', location.pathname);
+      }
+    }
+  }, [allContributions, allVehicles, location.state, handleShowDiff]);
 
   const loadData = useCallback(async () => {
     try {
@@ -514,6 +714,7 @@ const BrowseContributionsPage = () => {
     setModalError(null);
     setIsSubmitting(false);
     setIsEditMode(false);
+    setIsNewlySubmitted(false);
 
     // Discard all unsaved changes
     discardChanges();
@@ -952,6 +1153,20 @@ const BrowseContributionsPage = () => {
               </div>
             </div>
           )}
+
+          {/* Success message for newly submitted contributions */}
+          {isNewlySubmitted && (
+            <div className="alert alert-success mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <h3 className="font-bold">Contribution Submitted Successfully!</h3>
+                <div className="text-sm">Your proposal has been submitted and is now pending review by moderators. You can see the details below.</div>
+              </div>
+            </div>
+          )}
+
           {modalError && (
             <div className="alert alert-error mb-4">
               <span>{modalError}</span>
@@ -970,6 +1185,7 @@ const BrowseContributionsPage = () => {
               getDraftValue={getDraftValue}
               isFieldModified={isFieldModified}
               updateDraftField={updateDraftField}
+              imageContributions={imageContributions}
             />
           )}
           <div className="modal-action">

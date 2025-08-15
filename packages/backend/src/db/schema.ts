@@ -21,6 +21,26 @@ export const vehicles = sqliteTable('vehicles', {
   description: text('description'),
 });
 
+export const vehicleImages = sqliteTable('vehicle_images', {
+  id: integer('id').primaryKey(),
+  vehicleId: integer('vehicle_id').notNull().references(() => vehicles.id, { onDelete: 'cascade' }),
+  filename: text('filename').notNull(), // Original filename
+  path: text('path').notNull(), // Relative path from uploads directory
+  url: text('url').notNull(), // Full URL to access the image
+  altText: text('alt_text'), // Alternative text for accessibility
+  caption: text('caption'), // Optional caption
+  displayOrder: integer('display_order').notNull().default(0), // Order in carousel
+  fileSize: integer('file_size'), // File size in bytes
+  mimeType: text('mime_type'), // MIME type (image/jpeg, image/png, etc.)
+  width: integer('width'), // Image width in pixels
+  height: integer('height'), // Image height in pixels
+  uploadedBy: integer('uploaded_by').references(() => users.id), // User who uploaded
+  uploadedAt: integer('uploaded_at', { mode: 'timestamp' }).notNull(),
+  isApproved: integer('is_approved', { mode: 'boolean' }).notNull().default(false),
+  approvedBy: integer('approved_by').references(() => users.id),
+  approvedAt: integer('approved_at', { mode: 'timestamp' }),
+});
+
 export const contributions = sqliteTable('contributions', {
   id: integer('id').primaryKey(),
   userId: integer('user_id').notNull().references(() => users.id),
@@ -32,6 +52,27 @@ export const contributions = sqliteTable('contributions', {
   approvedAt: integer('approved_at', { mode: 'timestamp' }),
   rejectedAt: integer('rejected_at', { mode: 'timestamp' }),
   cancelledAt: integer('cancelled_at', { mode: 'timestamp' }),
+});
+
+export const imageContributions = sqliteTable('image_contributions', {
+  id: integer('id').primaryKey(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  vehicleId: integer('vehicle_id').notNull().references(() => vehicles.id),
+  contributionId: integer('contribution_id').references(() => contributions.id), // Link to specific proposal
+  filename: text('filename').notNull(),
+  originalFilename: text('original_filename').notNull(),
+  path: text('path').notNull(), // Temporary path until approved
+  altText: text('alt_text'),
+  caption: text('caption'),
+  fileSize: integer('file_size'),
+  mimeType: text('mime_type'),
+  width: integer('width'),
+  height: integer('height'),
+  status: text('status', { enum: ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'] }).notNull().default('PENDING'),
+  submittedAt: integer('submitted_at', { mode: 'timestamp' }).notNull(),
+  reviewedBy: integer('reviewed_by').references(() => users.id),
+  reviewedAt: integer('reviewed_at', { mode: 'timestamp' }),
+  rejectionReason: text('rejection_reason'),
 });
 
 export const contributionReviews = sqliteTable('contribution_reviews', {

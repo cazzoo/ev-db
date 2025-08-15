@@ -19,6 +19,10 @@ description: "Example description"
 - Use comments to explain why something is done a certain way
 - Document APIs, complex algorithms, and non-obvious side effects
 
+## Maintainability
+- Files should be approximatively 600 lines maximum
+- Avoid making complex logic
+
 ## Single Responsibility
 - Each function should do exactly one thing
 - Functions should be small and focused
