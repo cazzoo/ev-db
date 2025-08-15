@@ -6,12 +6,12 @@ async function checkContributions() {
     console.log('Checking existing contributions...');
     const existingContributions = await db.select().from(contributions);
     console.log(`Found ${existingContributions.length} contributions`);
-    
+
     for (const contrib of existingContributions) {
       console.log(`Contribution ${contrib.id}:`);
       console.log(`  - Type: ${contrib.changeType}`);
       console.log(`  - Target Vehicle ID: ${contrib.targetVehicleId}`);
-      console.log(`  - Vehicle Data ID: ${contrib.vehicleData?.id || 'N/A'}`);
+      console.log(`  - Vehicle Data ID: ${(contrib.vehicleData as any)?.id || 'N/A'}`);
       console.log(`  - Status: ${contrib.status}`);
       console.log(`  - User: ${contrib.userId}`);
       console.log('---');
@@ -20,7 +20,7 @@ async function checkContributions() {
     console.log('\nChecking vehicles...');
     const allVehicles = await db.select().from(vehicles);
     console.log(`Found ${allVehicles.length} vehicles`);
-    
+
     for (const vehicle of allVehicles) {
       console.log(`Vehicle ${vehicle.id}: ${vehicle.make} ${vehicle.model} (${vehicle.year})`);
     }

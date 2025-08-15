@@ -15,8 +15,10 @@
 [] I would like to have pagination for the vehicle retrieval, both the UI and API.
 [] Keyboard navigation for the vehicle list.
 [] Ability to delete a vehicle while being admin.
+[] As admin, when clicking on Admin button from nav, it shows sub items, when clicking on one of this item i'm getting redirected but the sub menu is still open.
 
 # Later
+[] Create dockerfile(s)/compose/stack to package/deploy this application.
 [] Add a monetezation mechanism for the users to top-up their credit balance. Use Wise business.
 [] Implement i18n
 [] Put in place TDD framework and feature tests to cover the application.

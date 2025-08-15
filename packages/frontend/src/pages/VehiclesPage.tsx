@@ -75,22 +75,8 @@ const VehiclesPage = () => {
     setDuplicateError(null);
   };
 
-  const handleSaveVehicle = async (vehicleData: Vehicle) => {
-    try {
-      if (currentVehicle && currentVehicle.id) {
-        await updateVehicle(currentVehicle.id, vehicleData);
-      } else {
-        await createVehicle(vehicleData);
-      }
-      loadData();
-      handleCloseModal();
-    } catch (err) {
-      setError((err as Error).message || 'Failed to save vehicle.');
-    }
-  };
-
   // Handler for admin form using MultiStepContributionForm
-  const handleAdminSubmit = async (vehicleData: Vehicle, changeType: 'NEW' | 'UPDATE', targetVehicleId?: number, images?: any[]) => {
+  const handleAdminSubmit = async (vehicleData: Vehicle, _changeType: 'NEW' | 'UPDATE', _targetVehicleId?: number, _images?: any[]) => {
     try {
       if (currentVehicle && currentVehicle.id) {
         await updateVehicle(currentVehicle.id, vehicleData);

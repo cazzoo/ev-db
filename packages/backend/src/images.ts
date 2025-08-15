@@ -135,10 +135,10 @@ imagesRouter.get('/contributions/pending', jwtAuth, async (c) => {
 });
 
 // Approve an image contribution (admin only)
-imagesRouter.post('/contributions/:id/approve', adminAuth, async (c) => {
+imagesRouter.post('/contributions/:id/approve', ...adminAuth, async (c) => {
   try {
     const contributionId = Number(c.req.param('id'));
-    const userId = c.get('userId');
+    const userId = c.get('userId') as number;
     const body = await c.req.json();
     const displayOrder = body.displayOrder;
 
@@ -154,15 +154,15 @@ imagesRouter.post('/contributions/:id/approve', adminAuth, async (c) => {
 
   } catch (error) {
     console.error('Error approving image contribution:', error);
-    return c.json({ error: error.message || 'Failed to approve image' }, 500);
+    return c.json({ error: (error as Error).message || 'Failed to approve image' }, 500);
   }
 });
 
 // Reject an image contribution (admin only)
-imagesRouter.post('/contributions/:id/reject', adminAuth, async (c) => {
+imagesRouter.post('/contributions/:id/reject', ...adminAuth, async (c) => {
   try {
     const contributionId = Number(c.req.param('id'));
-    const userId = c.get('userId');
+    const userId = c.get('userId') as number;
     const body = await c.req.json();
     const reason = body.reason;
 
@@ -175,12 +175,12 @@ imagesRouter.post('/contributions/:id/reject', adminAuth, async (c) => {
 
   } catch (error) {
     console.error('Error rejecting image contribution:', error);
-    return c.json({ error: error.message || 'Failed to reject image' }, 500);
+    return c.json({ error: (error as Error).message || 'Failed to reject image' }, 500);
   }
 });
 
 // Delete a vehicle image (admin only)
-imagesRouter.delete('/:id', adminAuth, async (c) => {
+imagesRouter.delete('/:id', ...adminAuth, async (c) => {
   try {
     const imageId = Number(c.req.param('id'));
 
@@ -193,12 +193,12 @@ imagesRouter.delete('/:id', adminAuth, async (c) => {
 
   } catch (error) {
     console.error('Error deleting image:', error);
-    return c.json({ error: error.message || 'Failed to delete image' }, 500);
+    return c.json({ error: (error as Error).message || 'Failed to delete image' }, 500);
   }
 });
 
 // Update image display order (admin only)
-imagesRouter.put('/vehicle/:vehicleId/order', adminAuth, async (c) => {
+imagesRouter.put('/vehicle/:vehicleId/order', ...adminAuth, async (c) => {
   try {
     const vehicleId = Number(c.req.param('vehicleId'));
     const body = await c.req.json();

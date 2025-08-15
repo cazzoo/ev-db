@@ -74,9 +74,9 @@ const ContributeVehiclePage: React.FC = () => {
         // Wait for all image submissions to complete
         await Promise.all(imageSubmissions);
 
-        showToast(`Contribution submitted with ${images.length} image(s)! Everything will be reviewed by moderators.`, 'success');
+        showToast('success', `Contribution submitted with ${images.length} image(s)! Everything will be reviewed by moderators.`);
       } else {
-        showToast('Contribution submitted successfully! It will be reviewed by moderators.', 'success');
+        showToast('success', 'Contribution submitted successfully! It will be reviewed by moderators.');
       }
 
       // Redirect to the contributions page with the review modal open for the new contribution
@@ -91,11 +91,11 @@ const ContributeVehiclePage: React.FC = () => {
 
       // Handle specific error types
       if (error.message?.includes('duplicate')) {
-        showToast('This vehicle may already exist. Please check the existing entries or create a variant.', 'warning');
+        showToast('warning', 'This vehicle may already exist. Please check the existing entries or create a variant.');
       } else if (error.message?.includes('validation')) {
-        showToast('Please check your input and try again.', 'error');
+        showToast('error', 'Please check your input and try again.');
       } else {
-        showToast('Failed to submit contribution. Please try again.', 'error');
+        showToast('error', 'Failed to submit contribution. Please try again.');
       }
     } finally {
       setIsSubmitting(false);

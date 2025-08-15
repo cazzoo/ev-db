@@ -765,7 +765,12 @@ const BrowseContributionsPage = () => {
   };
 
   const getDraftValue = (contributionId: number, fieldName: string, originalValue: string | number | undefined) => {
-    return draftChanges[contributionId]?.[fieldName as keyof Vehicle] ?? originalValue;
+    const draftValue = draftChanges[contributionId]?.[fieldName as keyof Vehicle];
+    // Only return primitive values, not arrays like images
+    if (typeof draftValue === 'string' || typeof draftValue === 'number' || draftValue === undefined) {
+      return draftValue ?? originalValue;
+    }
+    return originalValue;
   };
 
   const isFieldModified = (contributionId: number, fieldName: string) => {

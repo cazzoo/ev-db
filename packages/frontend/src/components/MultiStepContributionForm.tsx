@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Vehicle, fetchVehicleSuggestions, fetchModelsForMake, VehicleSuggestions, checkForDuplicate, DuplicateCheckResult } from '../services/api';
+import { Vehicle, fetchVehicleSuggestions, VehicleSuggestions, checkForDuplicate, DuplicateCheckResult } from '../services/api';
 import { AutocompleteInput } from './AutocompleteInput';
 import { Form, Input, Textarea, Button } from '../design-system';
 
@@ -71,11 +71,11 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
 
   // Autocomplete and validation state
   const [suggestions, setSuggestions] = useState<VehicleSuggestions>({ makes: [], models: [], modelsByMake: {} });
-  const [changeType, setChangeType] = useState<'NEW' | 'UPDATE'>(initialChangeType || 'NEW');
-  const [targetVehicleId, setTargetVehicleId] = useState<number | undefined>(initialTargetVehicleId);
+  const [changeType] = useState<'NEW' | 'UPDATE'>(initialChangeType || 'NEW');
+  const [targetVehicleId] = useState<number | undefined>(initialTargetVehicleId);
   const [duplicateCheck, setDuplicateCheck] = useState<DuplicateCheckResult | null>(null);
   const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
-  const duplicateCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const duplicateCheckTimeoutRef = useRef<number | null>(null);
 
   // Load suggestions on mount
   useEffect(() => {

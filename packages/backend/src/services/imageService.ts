@@ -63,6 +63,10 @@ export async function getVehicleImages(vehicleId: number): Promise<VehicleImage[
 
   return images.map(img => ({
     ...img,
+    altText: img.altText || undefined,
+    caption: img.caption || undefined,
+    fileSize: img.fileSize || undefined,
+    mimeType: img.mimeType || undefined,
     uploadedAt: new Date(img.uploadedAt),
     approvedAt: img.approvedAt ? new Date(img.approvedAt) : undefined,
     isApproved: Boolean(img.isApproved)
@@ -92,6 +96,10 @@ export async function getImagesForVehicles(vehicleIds: number[]): Promise<Record
       }
       imagesByVehicle[img.vehicleId].push({
         ...img,
+        altText: img.altText || undefined,
+        caption: img.caption || undefined,
+        fileSize: img.fileSize || undefined,
+        mimeType: img.mimeType || undefined,
         uploadedAt: new Date(img.uploadedAt),
         approvedAt: img.approvedAt ? new Date(img.approvedAt) : undefined,
         isApproved: Boolean(img.isApproved)
@@ -130,6 +138,11 @@ export async function createImageContribution(data: {
 
   return {
     ...contribution,
+    contributionId: contribution.contributionId || undefined,
+    altText: contribution.altText || undefined,
+    caption: contribution.caption || undefined,
+    fileSize: contribution.fileSize || undefined,
+    mimeType: contribution.mimeType || undefined,
     submittedAt: new Date(contribution.submittedAt),
     reviewedAt: contribution.reviewedAt ? new Date(contribution.reviewedAt) : undefined
   };
@@ -147,6 +160,11 @@ export async function getPendingImageContributions(): Promise<ImageContribution[
 
   return contributions.map(contrib => ({
     ...contrib,
+    contributionId: contrib.contributionId || undefined,
+    altText: contrib.altText || undefined,
+    caption: contrib.caption || undefined,
+    fileSize: contrib.fileSize || undefined,
+    mimeType: contrib.mimeType || undefined,
     submittedAt: new Date(contrib.submittedAt),
     reviewedAt: contrib.reviewedAt ? new Date(contrib.reviewedAt) : undefined
   }));
@@ -187,7 +205,7 @@ export async function approveImageContribution(
   const [vehicleImage] = await db
     .insert(vehicleImages)
     .values({
-      vehicleId: contribution.vehicleId,
+      vehicleId: Number(contribution.vehicleId),
       filename: contribution.filename,
       path: permanentPath,
       url: `${BASE_URL}/uploads${permanentPath}`,
@@ -212,12 +230,16 @@ export async function approveImageContribution(
     .set({
       status: 'APPROVED',
       reviewedBy: reviewerId,
-      reviewedAt: Date.now()
+      reviewedAt: new Date()
     })
     .where(eq(imageContributions.id, contributionId));
 
   return {
     ...vehicleImage,
+    altText: vehicleImage.altText || undefined,
+    caption: vehicleImage.caption || undefined,
+    fileSize: vehicleImage.fileSize || undefined,
+    mimeType: vehicleImage.mimeType || undefined,
     uploadedAt: new Date(vehicleImage.uploadedAt),
     approvedAt: new Date(vehicleImage.approvedAt!),
     isApproved: Boolean(vehicleImage.isApproved)
@@ -258,7 +280,7 @@ export async function rejectImageContribution(
     .set({
       status: 'REJECTED',
       reviewedBy: reviewerId,
-      reviewedAt: Date.now(),
+      reviewedAt: new Date(),
       rejectionReason: reason
     })
     .where(eq(imageContributions.id, contributionId));

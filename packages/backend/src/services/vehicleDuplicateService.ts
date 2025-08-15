@@ -117,9 +117,9 @@ export async function checkForDuplicate(vehicleData: VehicleData): Promise<Dupli
 
     // Check for very similar specifications (likely the same variant)
     const verySimilarMatch = existingVehicles.find(existing => {
-      const batteryTolerance = batteryCapacity ? Math.abs(existing.batteryCapacity - batteryCapacity) <= (batteryCapacity * 0.05) : false; // ±5%
-      const rangeTolerance = range ? Math.abs(existing.range - range) <= 25 : false; // ±25 km
-      const chargingTolerance = chargingSpeed ? Math.abs(existing.chargingSpeed - chargingSpeed) <= 10 : false; // ±10 kW
+      const batteryTolerance = batteryCapacity && existing.batteryCapacity ? Math.abs(existing.batteryCapacity - batteryCapacity) <= (batteryCapacity * 0.05) : false; // ±5%
+      const rangeTolerance = range && existing.range ? Math.abs(existing.range - range) <= 25 : false; // ±25 km
+      const chargingTolerance = chargingSpeed && existing.chargingSpeed ? Math.abs(existing.chargingSpeed - chargingSpeed) <= 10 : false; // ±10 kW
 
       return batteryTolerance && rangeTolerance && chargingTolerance;
     });
