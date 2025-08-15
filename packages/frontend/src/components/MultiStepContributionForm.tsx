@@ -3,13 +3,20 @@ import { Vehicle, fetchVehicleSuggestions, fetchModelsForMake, VehicleSuggestion
 import { AutocompleteInput } from './AutocompleteInput';
 import { Form, Input, Textarea, Button } from '../design-system';
 
+interface ImageWithMetadata {
+  file: File;
+  caption: string;
+  altText: string;
+}
+
 interface MultiStepContributionFormProps {
-  onSubmit: (vehicleData: Vehicle, changeType: 'NEW' | 'UPDATE', targetVehicleId?: number, images?: File[]) => void;
+  onSubmit: (vehicleData: Vehicle, changeType: 'NEW' | 'UPDATE', targetVehicleId?: number, images?: ImageWithMetadata[]) => void;
   onCancel: () => void;
   initialData?: Partial<Vehicle>;
   initialChangeType?: 'NEW' | 'UPDATE';
   initialTargetVehicleId?: number;
   isVariantMode?: boolean;
+  isAdmin?: boolean;
 }
 
 interface FormData {
@@ -23,7 +30,7 @@ interface FormData {
   topSpeed: number;
   price: number;
   description: string;
-  images: File[];
+  images: ImageWithMetadata[];
 }
 
 interface StepValidation {
@@ -92,7 +99,13 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
   const handleImageUpload = useCallback((files: FileList | null) => {
     if (!files) return;
 
-    const newImages = Array.from(files).slice(0, 5 - formData.images.length); // Limit to 5 total
+    const newFiles = Array.from(files).slice(0, 5 - formData.images.length); // Limit to 5 total
+    const newImages: ImageWithMetadata[] = newFiles.map(file => ({
+      file,
+      caption: '',
+      altText: ''
+    }));
+
     setFormData(prev => ({
       ...prev,
       images: [...prev.images, ...newImages]
@@ -103,6 +116,16 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
     setFormData(prev => ({
       ...prev,
       images: prev.images.filter((_, i) => i !== index)
+    }));
+  }, []);
+
+  // Handle image metadata updates
+  const updateImageMetadata = useCallback((index: number, field: 'caption' | 'altText', value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.map((img, i) =>
+        i === index ? { ...img, [field]: value } : img
+      )
     }));
   }, []);
 
@@ -128,16 +151,22 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
         if (formData.topSpeed < 0) errors.push('Top speed cannot be negative');
         if (formData.price < 0) errors.push('Price cannot be negative');
         break;
-      case 4: // Images - optional but validate file types if provided
+      case 4: // Images - optional but validate file types and metadata if provided
         if (formData.images.length > 0) {
           const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
           const maxSize = 10 * 1024 * 1024; // 10MB
-          for (const file of formData.images) {
+          for (let i = 0; i < formData.images.length; i++) {
+            const imageData = formData.images[i];
+            const file = imageData.file;
+
             if (!validTypes.includes(file.type)) {
               errors.push(`${file.name}: Only JPEG, PNG, and WebP images are allowed`);
             }
             if (file.size > maxSize) {
               errors.push(`${file.name}: File size must be less than 10MB`);
+            }
+            if (!imageData.altText.trim()) {
+              errors.push(`${file.name}: Alt text is required for accessibility`);
             }
           }
           if (formData.images.length > 5) {
@@ -477,29 +506,72 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
 
                   {/* Image previews */}
                   {formData.images.length > 0 && (
-                    <div className="space-y-2">
+                    <div className="space-y-4">
                       <h4 className="font-medium">Selected Images ({formData.images.length}/5)</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {formData.images.map((file, index) => (
-                          <div key={index} className="relative group">
-                            <div className="aspect-video bg-base-200 rounded-lg overflow-hidden">
-                              <img
-                                src={URL.createObjectURL(file)}
-                                alt={`Preview ${index + 1}`}
-                                className="w-full h-full object-cover"
-                              />
+                      <div className="space-y-6">
+                        {formData.images.map((imageData, index) => (
+                          <div key={index} className="card bg-base-100 border border-base-300">
+                            <div className="card-body p-4">
+                              <div className="flex gap-4">
+                                {/* Image preview */}
+                                <div className="relative group flex-shrink-0">
+                                  <div className="w-32 h-24 bg-base-200 rounded-lg overflow-hidden">
+                                    <img
+                                      src={URL.createObjectURL(imageData.file)}
+                                      alt={imageData.altText || `Preview ${index + 1}`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeImage(index)}
+                                    className="absolute -top-2 -right-2 btn btn-circle btn-xs btn-error opacity-0 group-hover:opacity-100 transition-opacity"
+                                    title="Remove image"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+
+                                {/* Image metadata fields */}
+                                <div className="flex-1 space-y-3">
+                                  <div>
+                                    <p className="text-sm font-medium text-base-content/70 mb-1">
+                                      {imageData.file.name}
+                                    </p>
+                                  </div>
+
+                                  {/* Alt text field */}
+                                  <div className="form-control">
+                                    <label className="label py-1">
+                                      <span className="label-text text-sm font-medium">
+                                        Alt Text <span className="text-error">*</span>
+                                      </span>
+                                    </label>
+                                    <input
+                                      type="text"
+                                      className="input input-bordered input-sm"
+                                      placeholder="Describe the image for accessibility (required)"
+                                      value={imageData.altText}
+                                      onChange={(e) => updateImageMetadata(index, 'altText', e.target.value)}
+                                    />
+                                  </div>
+
+                                  {/* Caption field */}
+                                  <div className="form-control">
+                                    <label className="label py-1">
+                                      <span className="label-text text-sm font-medium">Caption</span>
+                                    </label>
+                                    <input
+                                      type="text"
+                                      className="input input-bordered input-sm"
+                                      placeholder="Optional caption for the image"
+                                      value={imageData.caption}
+                                      onChange={(e) => updateImageMetadata(index, 'caption', e.target.value)}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => removeImage(index)}
-                              className="absolute -top-2 -right-2 btn btn-circle btn-xs btn-error opacity-0 group-hover:opacity-100 transition-opacity"
-                              title="Remove image"
-                            >
-                              ✕
-                            </button>
-                            <p className="text-xs text-center mt-1 truncate" title={file.name}>
-                              {file.name}
-                            </p>
                           </div>
                         ))}
                       </div>
@@ -601,14 +673,29 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
                     <div className="card-body">
                       <h3 className="card-title text-lg">Images ({formData.images.length})</h3>
                       {formData.images.length > 0 ? (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
-                          {formData.images.map((file, index) => (
-                            <div key={index} className="aspect-video bg-base-300 rounded overflow-hidden">
-                              <img
-                                src={URL.createObjectURL(file)}
-                                alt={`Preview ${index + 1}`}
-                                className="w-full h-full object-cover"
-                              />
+                        <div className="space-y-3 mt-2">
+                          {formData.images.map((imageData, index) => (
+                            <div key={index} className="flex gap-3 p-3 bg-base-100 rounded-lg">
+                              <div className="w-20 h-16 bg-base-300 rounded overflow-hidden flex-shrink-0">
+                                <img
+                                  src={URL.createObjectURL(imageData.file)}
+                                  alt={imageData.altText || `Preview ${index + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{imageData.file.name}</p>
+                                {imageData.altText && (
+                                  <p className="text-xs text-base-content/70 mt-1">
+                                    <span className="font-medium">Alt:</span> {imageData.altText}
+                                  </p>
+                                )}
+                                {imageData.caption && (
+                                  <p className="text-xs text-base-content/70 mt-1">
+                                    <span className="font-medium">Caption:</span> {imageData.caption}
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>

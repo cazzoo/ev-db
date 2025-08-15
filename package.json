@@ -1,12 +1,15 @@
 {
-  "name": "ev-db-clone",
+  "name": "ev-db",
   "version": "1.0.0",
-  "description": "",
+  "description": "A comprehensive, community-driven platform for electric vehicle data management with contribution workflows, image galleries, and API access.",
   "main": "index.js",
   "scripts": {
+    "dev:frontend": "pnpm --filter frontend dev",
+    "dev:backend": "pnpm --filter backend dev",
+    "build": "pnpm --filter frontend build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": ["electric-vehicles", "ev", "database", "react", "typescript", "hono", "daisyui"],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.12.4",

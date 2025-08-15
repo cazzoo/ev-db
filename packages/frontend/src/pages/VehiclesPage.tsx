@@ -14,6 +14,7 @@ import {
   DuplicateError
 } from '../services/api';
 import ContributionForm from '../components/ContributionForm';
+import MultiStepContributionForm from '../components/MultiStepContributionForm';
 import DataTable, { Column } from '../components/DataTable';
 import VehicleCardGrid from '../components/VehicleCardGrid';
 import VehicleDetailsView from '../components/VehicleDetailsView';
@@ -81,6 +82,22 @@ const VehiclesPage = () => {
       } else {
         await createVehicle(vehicleData);
       }
+      loadData();
+      handleCloseModal();
+    } catch (err) {
+      setError((err as Error).message || 'Failed to save vehicle.');
+    }
+  };
+
+  // Handler for admin form using MultiStepContributionForm
+  const handleAdminSubmit = async (vehicleData: Vehicle, changeType: 'NEW' | 'UPDATE', targetVehicleId?: number, images?: any[]) => {
+    try {
+      if (currentVehicle && currentVehicle.id) {
+        await updateVehicle(currentVehicle.id, vehicleData);
+      } else {
+        await createVehicle(vehicleData);
+      }
+      // TODO: Handle image uploads for admin-created vehicles
       loadData();
       handleCloseModal();
     } catch (err) {
@@ -499,7 +516,13 @@ const VehiclesPage = () => {
                       isVariantMode={contributeMode === 'VARIANT'}
                     />
                   ) : (
-                    <VehicleForm onSubmit={handleSaveVehicle} vehicle={currentVehicle} />
+                    <MultiStepContributionForm
+                      onSubmit={handleAdminSubmit}
+                      onCancel={handleCloseModal}
+                      initialData={currentVehicle || undefined}
+                      initialChangeType={currentVehicle ? 'UPDATE' : 'NEW'}
+                      isAdmin={true}
+                    />
                   )}
                   <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={handleCloseModal}>✕</button>
                 </div>
@@ -512,110 +535,6 @@ const VehiclesPage = () => {
   );
 };
 
-const VehicleForm = ({ onSubmit, vehicle }: { onSubmit: (data: Vehicle) => void, vehicle: Vehicle | null }) => {
-  const [formData, setFormData] = useState<Vehicle>({
-    make: '',
-    model: '',
-    year: new Date().getFullYear(),
-    batteryCapacity: 0,
-    range: 0,
-    chargingSpeed: 0,
-    ...vehicle,
-  });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type } = e.target;
-    setFormData({
-      ...formData,
-      [name]: type === 'number' ? Number(value) : value,
-    });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit(formData);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="form-control w-full">
-        <label className="label">
-          <span className="label-text">Make</span>
-        </label>
-        <input
-          type="text"
-          name="make"
-          className="input input-bordered w-full"
-          value={formData.make}
-          onChange={handleChange}
-          required
-        />
-      </div>
-      <div className="form-control w-full">
-        <label className="label">
-          <span className="label-text">Model</span>
-        </label>
-        <input
-          type="text"
-          name="model"
-          className="input input-bordered w-full"
-          value={formData.model}
-          onChange={handleChange}
-          required
-        />
-      </div>
-      <div className="form-control w-full">
-        <label className="label">
-          <span className="label-text">Year</span>
-        </label>
-        <input
-          type="number"
-          name="year"
-          className="input input-bordered w-full"
-          value={formData.year}
-          onChange={handleChange}
-          required
-        />
-      </div>
-      <div className="form-control w-full">
-        <label className="label">
-          <span className="label-text">Battery Capacity (kWh)</span>
-        </label>
-        <input
-          type="number"
-          name="batteryCapacity"
-          className="input input-bordered w-full"
-          value={formData.batteryCapacity}
-          onChange={handleChange}
-        />
-      </div>
-      <div className="form-control w-full">
-        <label className="label">
-          <span className="label-text">Range (km)</span>
-        </label>
-        <input
-          type="number"
-          name="range"
-          className="input input-bordered w-full"
-          value={formData.range}
-          onChange={handleChange}
-        />
-      </div>
-      <div className="form-control w-full">
-        <label className="label">
-          <span className="label-text">Charging Speed (kW)</span>
-        </label>
-        <input
-          type="number"
-          name="chargingSpeed"
-          className="input input-bordered w-full"
-          value={formData.chargingSpeed}
-          onChange={handleChange}
-        />
-      </div>
-      <button type="submit" className="btn btn-primary">Save</button>
-    </form>
-  );
-};
 
 export default VehiclesPage;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import DataTable, { Column } from '../components/DataTable';
@@ -433,6 +433,9 @@ const BrowseContributionsPage = () => {
   const [modifiedFields, setModifiedFields] = useState<Record<number, Set<string>>>({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  // Ref to track processed auto-opens to prevent reopening after approval
+  const processedAutoOpenRef = useRef<number | null>(null);
+
   // Helper function to get related proposals for a vehicle
   // Only returns PENDING proposals to prevent navigation through cancelled/rejected proposals
   const getRelatedProposals = (targetContribution: Contribution, allContributions: Contribution[], vehicles?: Vehicle[]): Contribution[] => {
@@ -569,17 +572,33 @@ const BrowseContributionsPage = () => {
     });
   }, [imageContributions]);
 
+  // Reset processed auto-open when location changes
+  useEffect(() => {
+    processedAutoOpenRef.current = null;
+  }, [location.pathname, location.search]);
+
   // Auto-open modal for newly submitted contribution
   useEffect(() => {
     const state = location.state as { openContributionId?: number; showSuccessMessage?: boolean };
     if (state?.openContributionId && allContributions.length > 0 && allVehicles.length > 0) {
+      // Check if we've already processed this auto-open to prevent reopening after approval
+      if (processedAutoOpenRef.current === state.openContributionId) {
+        return;
+      }
+
       const contributionToOpen = allContributions.find(c => c.id === state.openContributionId);
       if (contributionToOpen) {
         console.log('🎯 Auto-opening modal for contribution:', state.openContributionId);
+        processedAutoOpenRef.current = state.openContributionId;
         setIsNewlySubmitted(state.showSuccessMessage || false);
         handleShowDiff(contributionToOpen, allVehicles, allContributions);
 
         // Clear the state to prevent re-opening on subsequent renders
+        window.history.replaceState({}, '', location.pathname);
+      } else if (state?.openContributionId) {
+        // Contribution not found (likely approved/rejected), clear the state
+        console.log('🚫 Contribution not found (likely approved/rejected):', state.openContributionId);
+        processedAutoOpenRef.current = state.openContributionId;
         window.history.replaceState({}, '', location.pathname);
       }
     }

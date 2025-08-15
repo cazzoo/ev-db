@@ -5,6 +5,12 @@ import { useToast } from '../context/ToastContext';
 import { Vehicle, submitContribution, submitImageContribution } from '../services/api';
 import MultiStepContributionForm from '../components/MultiStepContributionForm';
 
+interface ImageWithMetadata {
+  file: File;
+  caption: string;
+  altText: string;
+}
+
 interface LocationState {
   mode?: 'UPDATE' | 'VARIANT';
   vehicleData?: Vehicle;
@@ -33,7 +39,7 @@ const ContributeVehiclePage: React.FC = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleSubmit = async (vehicleData: Vehicle, changeType: 'NEW' | 'UPDATE', targetVehicleId?: number, images?: File[]) => {
+  const handleSubmit = async (vehicleData: Vehicle, changeType: 'NEW' | 'UPDATE', targetVehicleId?: number, images?: ImageWithMetadata[]) => {
     setIsSubmitting(true);
     try {
       // First submit the vehicle contribution
@@ -44,7 +50,7 @@ const ContributeVehiclePage: React.FC = () => {
         console.log(`Submitting ${images.length} images for contribution ${contribution.id}`);
 
         // Submit each image as an image contribution
-        const imageSubmissions = images.map(async (image) => {
+        const imageSubmissions = images.map(async (imageData) => {
           try {
             // Use the target vehicle ID for the image contribution
             const vehicleIdForImage = targetVehicleId || contribution.vehicleData.id;
@@ -52,7 +58,13 @@ const ContributeVehiclePage: React.FC = () => {
               throw new Error('No vehicle ID available for image submission');
             }
 
-            return await submitImageContribution(vehicleIdForImage, image, contribution.id);
+            return await submitImageContribution(
+              vehicleIdForImage,
+              imageData.file,
+              contribution.id,
+              imageData.altText,
+              imageData.caption
+            );
           } catch (error) {
             console.error('Error submitting image:', error);
             throw error;

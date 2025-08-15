@@ -62,10 +62,13 @@ const VehicleImageCarousel: React.FC<VehicleImageCarouselProps> = ({
     }
   };
 
-  const goToSlide = (index: number) => {
+  const goToSlide = (index: number, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation(); // Prevent event bubbling to parent components
+    }
     handleUserInteraction();
     setCurrentIndex(index);
-    
+
     // Scroll to the specific slide
     const carousel = carouselRef.current;
     if (carousel) {
@@ -76,12 +79,18 @@ const VehicleImageCarousel: React.FC<VehicleImageCarouselProps> = ({
     }
   };
 
-  const goToPrevious = () => {
+  const goToPrevious = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation(); // Prevent event bubbling to parent components
+    }
     const newIndex = currentIndex === 0 ? displayImages.length - 1 : currentIndex - 1;
     goToSlide(newIndex);
   };
 
-  const goToNext = () => {
+  const goToNext = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation(); // Prevent event bubbling to parent components
+    }
     const newIndex = (currentIndex + 1) % displayImages.length;
     goToSlide(newIndex);
   };
@@ -90,9 +99,11 @@ const VehicleImageCarousel: React.FC<VehicleImageCarouselProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
+      e.stopPropagation();
       goToPrevious();
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
+      e.stopPropagation();
       goToNext();
     }
   };
@@ -102,17 +113,20 @@ const VehicleImageCarousel: React.FC<VehicleImageCarouselProps> = ({
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    e.stopPropagation(); // Prevent event bubbling during touch interactions
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
+    e.stopPropagation(); // Prevent event bubbling during touch interactions
     setTouchEnd(e.targetTouches[0].clientX);
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    e.stopPropagation(); // Prevent event bubbling during touch interactions
     if (!touchStart || !touchEnd) return;
-    
+
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > 50;
     const isRightSwipe = distance < -50;
@@ -153,7 +167,7 @@ const VehicleImageCarousel: React.FC<VehicleImageCarouselProps> = ({
             const placeholder = document.createElement('div');
             placeholder.className = 'w-full h-full';
             target.parentNode?.replaceChild(placeholder, target);
-            
+
             // Render VehicleImage component as fallback
             import('react-dom').then(({ render }) => {
               render(
@@ -179,7 +193,7 @@ const VehicleImageCarousel: React.FC<VehicleImageCarouselProps> = ({
 
   // Multiple images - full carousel
   return (
-    <div 
+    <div
       className={`relative ${className}`}
       onKeyDown={handleKeyDown}
       tabIndex={0}
@@ -187,7 +201,7 @@ const VehicleImageCarousel: React.FC<VehicleImageCarouselProps> = ({
       aria-label={`Image carousel for ${vehicleMake} ${vehicleModel}`}
     >
       {/* Main carousel */}
-      <div 
+      <div
         ref={carouselRef}
         className="carousel w-full h-full"
         onTouchStart={handleTouchStart}
@@ -210,7 +224,7 @@ const VehicleImageCarousel: React.FC<VehicleImageCarouselProps> = ({
                 const placeholder = document.createElement('div');
                 placeholder.className = 'w-full h-full';
                 target.parentNode?.replaceChild(placeholder, target);
-                
+
                 // Render VehicleImage component as fallback
                 import('react-dom').then(({ render }) => {
                   render(
@@ -225,7 +239,7 @@ const VehicleImageCarousel: React.FC<VehicleImageCarouselProps> = ({
                 });
               }}
             />
-            
+
             {/* Caption overlay */}
             {image.caption && (
               <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-2 text-sm">
@@ -267,11 +281,11 @@ const VehicleImageCarousel: React.FC<VehicleImageCarouselProps> = ({
             <button
               key={index}
               className={`w-2 h-2 rounded-full transition-all duration-200 ${
-                index === currentIndex 
-                  ? 'bg-white' 
+                index === currentIndex
+                  ? 'bg-white'
                   : 'bg-white bg-opacity-50 hover:bg-opacity-75'
               }`}
-              onClick={() => goToSlide(index)}
+              onClick={(e) => goToSlide(index, e)}
               aria-label={`Go to image ${index + 1}`}
             />
           ))}
