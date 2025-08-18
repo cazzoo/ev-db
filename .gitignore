@@ -195,3 +195,6 @@ storybook-static/
 # Temporary files
 .tmp/
 .temp/
+
+# Custom files
+ENHANCEMENT_PROPOSALS.md

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { db, sqlClient } from './db';
-import { contributions, users, contributionReviews, vehicles, imageContributions, vehicleImages } from './db/schema';
-import { eq, and, count, sql } from 'drizzle-orm';
+import { contributions, users, contributionReviews, vehicles, imageContributions, vehicleImages, moderationLogs } from './db/schema';
+import { eq, and, count, sql, or } from 'drizzle-orm';
 import { jwt } from 'hono/jwt';
 import { apiKeyAuth } from './middleware/apiKeyAuth';
 import { moderatorAuth } from './middleware/adminAuth';
@@ -55,6 +55,37 @@ const ensureChangeColumns = async () => {
   } catch (e: any) {
     if (e.message && e.message.includes('duplicate column name')) {
       console.log('cancelled_at column already exists');
+    }
+  }
+  try {
+    console.log('Ensuring moderation_logs table exists...');
+    await sqlClient.execute(`CREATE TABLE IF NOT EXISTS moderation_logs (
+      id INTEGER PRIMARY KEY,
+      target_type TEXT NOT NULL DEFAULT 'CONTRIBUTION',
+      target_id INTEGER NOT NULL,
+      action TEXT NOT NULL,
+      moderator_id INTEGER NOT NULL,
+      comment TEXT,
+      created_at INTEGER NOT NULL
+    )`);
+  } catch (e: any) {
+    console.log('moderation_logs table ensure error:', e.message);
+  }
+  // New moderation fields
+  try {
+    console.log('Ensuring rejection_comment column exists...');
+    await sqlClient.execute("ALTER TABLE contributions ADD COLUMN rejection_comment text");
+  } catch (e: any) {
+    if (e.message && e.message.includes('duplicate column name')) {
+      console.log('rejection_comment column already exists');
+    }
+  }
+  try {
+    console.log('Ensuring rejected_by column exists...');
+    await sqlClient.execute("ALTER TABLE contributions ADD COLUMN rejected_by integer");
+  } catch (e: any) {
+    if (e.message && e.message.includes('duplicate column name')) {
+      console.log('rejected_by column already exists');
     }
   }
 
@@ -170,6 +201,8 @@ contributionsRouter.get('/pending', async (c) => {
       approvedAt: contributions.approvedAt,
       rejectedAt: contributions.rejectedAt,
       cancelledAt: contributions.cancelledAt,
+      rejectionComment: (contributions as any).rejectionComment,
+      rejectedBy: (contributions as any).rejectedBy,
       votes: count(contributionReviews.id),
     })
     .from(contributions)
@@ -196,6 +229,8 @@ contributionsRouter.get('/all', async (c) => {
       approvedAt: contributions.approvedAt,
       rejectedAt: contributions.rejectedAt,
       cancelledAt: contributions.cancelledAt,
+      rejectionComment: (contributions as any).rejectionComment,
+      rejectedBy: (contributions as any).rejectedBy,
       votes: count(contributionReviews.id),
     })
     .from(contributions)
@@ -224,6 +259,8 @@ contributionsRouter.get('/my', userAuth, async (c) => {
       approvedAt: contributions.approvedAt,
       rejectedAt: contributions.rejectedAt,
       cancelledAt: contributions.cancelledAt,
+      rejectionComment: (contributions as any).rejectionComment,
+      rejectedBy: (contributions as any).rejectedBy,
       votes: count(contributionReviews.id),
     })
     .from(contributions)
@@ -420,6 +457,14 @@ contributionsRouter.post('/:id/approve', userAuth, async (c) => {
   }
 });
 
+// Simple HTML escape to prevent XSS in stored comments
+const escapeHtml = (unsafe: string) => unsafe
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#039;');
+
 // Reject a contribution (Admin/Moderator only)
 contributionsRouter.post('/:id/reject', userAuth, async (c) => {
   await ensureChangeColumns();
@@ -432,6 +477,16 @@ contributionsRouter.post('/:id/reject', userAuth, async (c) => {
   if (isNaN(contributionId)) {
     return c.json({ error: 'Invalid contribution ID' }, 400);
   }
+
+  // Parse and validate rejection comment
+  let body: any = {};
+  try { body = await c.req.json(); } catch {}
+  const rawComment: string = (body?.comment || '').toString();
+  const comment = rawComment.trim();
+  if (!comment || comment.length < 10) {
+    return c.json({ error: 'Rejection comment is required and must be at least 10 characters.' }, 400);
+  }
+  const sanitizedComment = escapeHtml(comment);
 
   try {
     const [contribution] = await db.select().from(contributions).where(eq(contributions.id, contributionId)).limit(1);
@@ -475,8 +530,41 @@ contributionsRouter.post('/:id/reject', userAuth, async (c) => {
         .where(eq(imageContributions.id, image.id));
     }
 
-    // Update contribution status
-    await db.update(contributions).set({ status: 'REJECTED', rejectedAt: new Date() }).where(eq(contributions.id, contributionId));
+    // Update contribution status and store moderation fields
+    await db.update(contributions)
+      .set({
+        status: 'REJECTED',
+        rejectedAt: new Date(),
+        rejectionComment: sanitizedComment,
+        rejectedBy: payload.userId
+      })
+      .where(eq(contributions.id, contributionId));
+
+    // Send notification email (dev stub)
+    try {
+      const [contributor] = await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.id, contribution.userId)).limit(1);
+      if (contributor?.email) {
+        const { sendContributionRejectionEmail } = await import('./services/emailService');
+        await sendContributionRejectionEmail(contributor.email, contribution.vehicleData as any, comment);
+      }
+    } catch (emailErr) {
+      console.warn('Email notification failed:', emailErr);
+    }
+
+    // Audit log + moderation log row
+    console.log(`AUDIT: Contribution ${contributionId} rejected by user ${payload.userId} at ${new Date().toISOString()} with reason: ${comment}`);
+    try {
+      await db.insert(moderationLogs).values({
+        targetType: 'CONTRIBUTION',
+        targetId: contributionId,
+        action: 'REJECT',
+        moderatorId: payload.userId,
+        comment: sanitizedComment,
+        createdAt: new Date(),
+      });
+    } catch (logErr) {
+      console.warn('Failed to persist moderation log:', logErr);
+    }
 
     const imageCleanupMessage = associatedImages.length > 0
       ? ` and ${associatedImages.length} associated image(s) cleaned up`
@@ -484,7 +572,8 @@ contributionsRouter.post('/:id/reject', userAuth, async (c) => {
 
     return c.json({
       message: `Contribution rejected successfully${imageCleanupMessage}`,
-      imagesCleanedUp: associatedImages.length
+      imagesCleanedUp: associatedImages.length,
+      rejectionComment: sanitizedComment
     }, 200);
   } catch (error) {
     console.error('Error rejecting contribution:', error);
@@ -550,6 +639,46 @@ contributionsRouter.post('/:id/cancel', userAuth, async (c) => {
       .set({ status: 'CANCELLED', cancelledAt: new Date() })
       .where(eq(contributions.id, contributionId));
 
+// Resubmit a rejected contribution (owner only): clone into new PENDING proposal keeping vehicleData
+contributionsRouter.post('/:id/resubmit', userAuth, async (c) => {
+  await ensureChangeColumns();
+  const payload = c.get('jwtPayload');
+  const userId = payload.userId;
+  const contributionId = Number(c.req.param('id'));
+
+  if (isNaN(contributionId)) {
+    return c.json({ error: 'Invalid contribution ID' }, 400);
+  }
+
+  try {
+    const [contribution] = await db.select().from(contributions).where(eq(contributions.id, contributionId)).limit(1);
+    if (!contribution) {
+      return c.json({ error: 'Contribution not found' }, 404);
+    }
+    if (contribution.userId !== userId) {
+      return c.json({ error: 'You can only resubmit your own contributions' }, 403);
+    }
+    if (contribution.status !== 'REJECTED') {
+      return c.json({ error: 'Only rejected contributions can be resubmitted' }, 400);
+    }
+
+    // Create a fresh pending contribution with same payload; clear moderation fields
+    const [newContribution] = await db.insert(contributions).values({
+      userId: contribution.userId,
+      vehicleData: contribution.vehicleData,
+      status: 'PENDING',
+      changeType: contribution.changeType,
+      targetVehicleId: contribution.targetVehicleId,
+      createdAt: new Date(),
+    }).returning();
+
+    return c.json({ message: 'Contribution resubmitted successfully', contribution: newContribution }, 201);
+  } catch (error) {
+    console.error('Error resubmitting contribution:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
     const imageCleanupMessage = associatedImages.length > 0
       ? ` and ${associatedImages.length} associated image(s) cleaned up`
       : '';
@@ -585,6 +714,7 @@ contributionsRouter.put('/:id', userAuth, async (c) => {
   if (!vehicleData.make || !vehicleData.model || !vehicleData.year) {
     return c.json({ error: 'Make, model, and year are required' }, 400);
   }
+
 
   try {
     const [contribution] = await db.select().from(contributions).where(eq(contributions.id, contributionId)).limit(1);

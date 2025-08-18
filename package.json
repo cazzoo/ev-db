@@ -7,7 +7,9 @@
     "dev:frontend": "pnpm --filter frontend dev",
     "dev:backend": "pnpm --filter backend dev",
     "build": "pnpm --filter frontend build",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test:backend": "pnpm --filter backend vitest run",
+    "test:frontend": "pnpm --filter frontend vitest run",
+    "test:all": "pnpm run test:backend && pnpm run test:frontend"
   },
   "keywords": ["electric-vehicles", "ev", "database", "react", "typescript", "hono", "daisyui"],
   "author": "",

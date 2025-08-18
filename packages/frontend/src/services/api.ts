@@ -223,6 +223,8 @@ export interface Contribution {
   createdAt: string;
   approvedAt?: string;
   rejectedAt?: string;
+  rejectedBy?: number;
+  rejectionComment?: string;
   cancelledAt?: string;
   votes?: number; // Added votes property
 }
@@ -361,12 +363,14 @@ export const approveContribution = async (id: number): Promise<void> => {
   }
 };
 
-export const rejectContribution = async (id: number): Promise<void> => {
+export const rejectContribution = async (id: number, comment: string): Promise<void> => {
   const response = await fetch(`${API_URL}/contributions/${id}/reject`, {
     method: 'POST',
     headers: {
+      'Content-Type': 'application/json',
       ...getAuthHeaders(),
     },
+    body: JSON.stringify({ comment }),
   });
 
   const data = await response.json();
@@ -388,6 +392,41 @@ export const cancelMyContribution = async (id: number): Promise<void> => {
     throw new Error(data.error || 'Failed to cancel contribution');
   }
 };
+export const resubmitContribution = async (id: number): Promise<Contribution> => {
+  const response = await fetch(`${API_URL}/contributions/${id}/resubmit`, {
+    method: 'POST',
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to resubmit contribution');
+  }
+  return data.contribution;
+};
+export interface ModerationLog {
+  id: number;
+  action: 'REJECT';
+  moderatorId: number;
+  moderatorEmail?: string;
+  comment?: string;
+  createdAt: string;
+}
+
+export const fetchModerationLogs = async (contributionId: number): Promise<ModerationLog[]> => {
+  const response = await fetch(`${API_URL}/contributions/${contributionId}/moderation-logs`, {
+    headers: { ...getAuthHeaders() },
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(text || 'Failed to fetch moderation logs');
+  }
+  const data = await response.json().catch(() => ({ logs: [] }));
+  return (data.logs || []) as ModerationLog[];
+};
+
+
 
 export const updateMyContribution = async (id: number, vehicleData: Vehicle, changeType?: 'NEW' | 'UPDATE', targetVehicleId?: number): Promise<void> => {
   const response = await fetch(`${API_URL}/contributions/${id}`, {

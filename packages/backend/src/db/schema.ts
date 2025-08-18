@@ -52,6 +52,9 @@ export const contributions = sqliteTable('contributions', {
   approvedAt: integer('approved_at', { mode: 'timestamp' }),
   rejectedAt: integer('rejected_at', { mode: 'timestamp' }),
   cancelledAt: integer('cancelled_at', { mode: 'timestamp' }),
+  // New moderation fields
+  rejectionComment: text('rejection_comment'),
+  rejectedBy: integer('rejected_by').references(() => users.id),
 });
 
 export const imageContributions = sqliteTable('image_contributions', {
@@ -80,6 +83,17 @@ export const contributionReviews = sqliteTable('contribution_reviews', {
   contributionId: integer('contribution_id').notNull().references(() => contributions.id),
   userId: integer('user_id').notNull().references(() => users.id),
   vote: integer('vote').notNull(), // +1 for upvote
+});
+
+// Moderation audit logs (currently used for contribution rejections)
+export const moderationLogs = sqliteTable('moderation_logs', {
+  id: integer('id').primaryKey(),
+  targetType: text('target_type').notNull().default('CONTRIBUTION'),
+  targetId: integer('target_id').notNull(),
+  action: text('action', { enum: ['REJECT'] }).notNull(),
+  moderatorId: integer('moderator_id').notNull().references(() => users.id),
+  comment: text('comment'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 
 export const apiKeys = sqliteTable('api_keys', {

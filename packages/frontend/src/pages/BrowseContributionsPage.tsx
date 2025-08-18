@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import DataTable, { Column } from '../components/DataTable';
 import VehicleImageCarousel from '../components/VehicleImageCarousel';
+import RejectionHistory from '../components/RejectionHistory';
 import {
   fetchPendingContributions,
   fetchAllContributions,
@@ -421,6 +422,11 @@ const BrowseContributionsPage = () => {
   const [modalError, setModalError] = useState<string | null>(null);
   const [imageContributions, setImageContributions] = useState<ImageContribution[]>([]);
   const [isNewlySubmitted, setIsNewlySubmitted] = useState(false);
+
+// Rejection form state
+const [showRejectForm, setShowRejectForm] = useState(false);
+const [rejectComment, setRejectComment] = useState('');
+const [rejectError, setRejectError] = useState<string | null>(null);
 
   // New state for multi-proposal navigation
   const [relatedProposals, setRelatedProposals] = useState<Contribution[]>([]);
@@ -987,15 +993,65 @@ const BrowseContributionsPage = () => {
               >
                 Approve
               </button>
-              <button
-                className="btn btn-error btn-sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleModalAction(rejectContribution, contribution.id);
-                }}
-              >
-                Reject
-              </button>
+              {!showRejectForm ? (
+                <button
+                  className="btn btn-error btn-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowRejectForm(true);
+                    setRejectError(null);
+                  }}
+                >
+                  Reject
+                </button>
+              ) : null}
+              {showRejectForm && selectedContribution?.id === contribution.id && (
+                <div className="w-full max-w-lg mt-2">
+                  {rejectError && (
+                    <div className="alert alert-error mb-2">
+                      <span>{rejectError}</span>
+                    </div>
+                  )}
+                  <textarea
+                    className="textarea textarea-bordered w-full"
+                    placeholder="Provide detailed rejection reason (min 10 characters)"
+                    value={rejectComment}
+                    onChange={(e) => setRejectComment(e.target.value)}
+                    rows={3}
+                  />
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      className="btn btn-error btn-sm"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const comment = rejectComment.trim();
+                        if (comment.length < 10) {
+                          setRejectError('Rejection comment must be at least 10 characters.');
+                          return;
+                        }
+                        setRejectError(null);
+                        setIsSubmitting(true);
+                        try {
+                          await rejectContribution(contribution.id, comment);
+                          await loadData();
+                          setShowRejectForm(false);
+                          setRejectComment('');
+                        } catch (err) {
+                          setRejectError((err as Error).message || 'Failed to reject contribution.');
+                        } finally {
+                          setIsSubmitting(false);
+                        }
+                      }}
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? 'Rejecting...' : 'Confirm Reject'}
+                    </button>
+                    <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); setShowRejectForm(false); setRejectComment(''); }} disabled={isSubmitting}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -1038,6 +1094,11 @@ const BrowseContributionsPage = () => {
                 {selectedContribution && (
                   <div className={`badge ${selectedContribution.changeType === 'NEW' ? 'badge-success' : 'badge-warning'}`}>
                     {selectedContribution.changeType === 'NEW' ? 'VARIANT' : 'UPDATE'}
+                  </div>
+                )}
+                {selectedContribution?.status === 'REJECTED' && selectedContribution?.rejectionComment && (
+                  <div className="alert alert-error mt-2">
+                    <span>Rejection reason: {selectedContribution.rejectionComment}</span>
                   </div>
                 )}
                 {selectedContribution && hasUnsavedChangesForProposal(selectedContribution.id) && (
@@ -1249,24 +1310,26 @@ const BrowseContributionsPage = () => {
                                   </svg>
                                   {isSubmitting ? 'Saving...' : 'Save Changes'}
                                 </button>
-                                <button
-                                  className="btn btn-outline btn-warning btn-sm"
-                                  onClick={() => discardChanges(selectedContribution.id)}
-                                  disabled={isSubmitting}
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                  </svg>
-                                  Discard Changes
-                                </button>
                               </>
                             )}
-                            <button className="btn btn-outline btn-secondary btn-sm" onClick={toggleEditMode} disabled={isSubmitting}>
+                            <button
+                              className="btn btn-outline btn-warning btn-sm"
+                              onClick={() => discardChanges(selectedContribution.id)}
+                              disabled={isSubmitting}
+                            >
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                               </svg>
-                              Exit Edit Mode
+                              Discard Changes
                             </button>
+                          </>
+                        )}
+                        <button className="btn btn-outline btn-secondary btn-sm" onClick={toggleEditMode} disabled={isSubmitting}>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                          Exit Edit Mode
+                        </button>
                           </>
                         )}
                         <button className="btn btn-error btn-sm" onClick={() => handleModalAction(cancelMyContribution, selectedContribution.id)} disabled={isSubmitting}>
@@ -1285,16 +1348,64 @@ const BrowseContributionsPage = () => {
                           </svg>
                           {isSubmitting ? 'Approving...' : 'Approve'}
                         </button>
-                        <button className="btn btn-error btn-sm" onClick={() => handleModalAction(rejectContribution, selectedContribution.id)} disabled={isSubmitting}>
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          {isSubmitting ? 'Rejecting...' : 'Reject'}
-                        </button>
+                        {!showRejectForm ? (
+                          <button className="btn btn-error btn-sm" onClick={() => { setShowRejectForm(true); setRejectError(null); }} disabled={isSubmitting}>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {isSubmitting ? 'Rejecting...' : 'Reject'}
+                          </button>
+                        ) : (
+                          <div className="w-full max-w-lg">
+                            {rejectError && (
+                              <div className="alert alert-error mb-2">
+                                <span>{rejectError}</span>
+                              </div>
+                            )}
+                            <textarea
+                              className="textarea textarea-bordered w-full"
+                              placeholder="Provide detailed rejection reason (min 10 characters)"
+                              value={rejectComment}
+                              onChange={(e) => setRejectComment(e.target.value)}
+                              rows={3}
+                            />
+                            <div className="flex gap-2 mt-2">
+                              <button
+                                className="btn btn-error btn-sm"
+                                onClick={async () => {
+                                  const comment = rejectComment.trim();
+                                  if (comment.length < 10) {
+                                    setRejectError('Rejection comment must be at least 10 characters.');
+                                    return;
+                                  }
+                                  setRejectError(null);
+                                  setIsSubmitting(true);
+                                  try {
+                                    await rejectContribution(selectedContribution!.id, comment);
+                                    await loadData();
+                                    setShowRejectForm(false);
+                                    setRejectComment('');
+                                    handleCloseDiff();
+                                  } catch (err) {
+                                    setRejectError((err as Error).message || 'Failed to reject contribution.');
+                                  } finally {
+                                    setIsSubmitting(false);
+                                  }
+                                }}
+                                disabled={isSubmitting}
+                              >
+                                {isSubmitting ? 'Rejecting...' : 'Confirm Reject'}
+                              </button>
+                              <button className="btn btn-ghost btn-sm" onClick={() => { setShowRejectForm(false); setRejectComment(''); }} disabled={isSubmitting}>
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
                       </>
+
                     )}
-                  </>
-                )}
               </div>
 
               {/* Close button - right side */}

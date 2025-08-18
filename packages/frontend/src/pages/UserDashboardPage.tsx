@@ -182,6 +182,17 @@ const UserDashboardPage = () => {
       },
     },
     {
+      key: 'rejectionComment',
+      header: 'Rejection Reason',
+      render: (_, contribution) => (
+        contribution.status === 'REJECTED' && contribution.rejectionComment ? (
+          <div className="text-sm text-error">
+            {contribution.rejectionComment}
+          </div>
+        ) : null
+      ),
+    },
+    {
       key: 'createdAt',
       header: 'Submitted At',
       accessor: 'createdAt',
@@ -191,21 +202,48 @@ const UserDashboardPage = () => {
       key: 'actions',
       header: 'Actions',
       render: (_, contribution) => {
-        return contribution.status === 'PENDING' ? (
-          <button
-            className="btn btn-outline btn-error btn-sm"
-            onClick={async () => {
-              try {
-                await cancelMyContribution(contribution.id);
-                loadMyContributions();
-              } catch (err) {
-                setError((err as Error).message || 'Failed to cancel contribution.');
-              }
-            }}
-          >
-            Cancel
-          </button>
-        ) : null;
+        if (contribution.status === 'PENDING') {
+          return (
+            <button
+              className="btn btn-outline btn-error btn-sm"
+              onClick={async () => {
+                try {
+                  await cancelMyContribution(contribution.id);
+                  loadMyContributions();
+                } catch (err) {
+                  setError((err as Error).message || 'Failed to cancel contribution.');
+                }
+              }}
+            >
+              Cancel
+            </button>
+          );
+        }
+        if (contribution.status === 'REJECTED') {
+          return (
+            <button
+              className="btn btn-outline btn-primary btn-sm"
+              onClick={async () => {
+                try {
+                  await resubmitContribution(contribution.id);
+                  loadMyContributions();
+                } catch (err) {
+                  setError((err as Error).message || 'Failed to resubmit contribution.');
+                }
+      {/* Rejection history for selected contribution (optional enhancement):
+          We can render per-row details, but here is a compact list when users have rejections */}
+      <div className="mt-6">
+        <h3 className="text-lg font-semibold mb-2">Recent Rejections</h3>
+        <div className="text-sm text-gray-500 mb-2">Click a rejected contribution to see its full details and history.</div>
+      </div>
+
+              }}
+            >
+              Resubmit
+            </button>
+          );
+        }
+        return null;
       },
     },
   ];
