@@ -27,13 +27,29 @@ const UserSwitcher = () => {
 
   const handleUserSwitch = async (email: string) => {
     try {
+      console.log(`Attempting to switch to user: ${email}`);
+
       // For development, we assume a default password for all users.
       const { token } = await loginUser(email, 'password');
+
+      console.log(`Login successful for ${email}, setting token...`);
       setToken(token);
-      window.location.reload(); // Reload to update the app state
+
+      // Use a small delay before reload to ensure token is set
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
+
     } catch (error) {
       console.error(`Failed to switch to user ${email}:`, error);
-      alert('Failed to switch user. Check the console for details.');
+
+      // Provide more detailed error information
+      let errorMessage = 'Failed to switch user.';
+      if (error instanceof Error) {
+        errorMessage += ` Error: ${error.message}`;
+      }
+
+      alert(errorMessage + ' Check the console for details.');
     }
   };
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { updateAdminUser, AdminUser, deleteUserAvatar } from '../services/api';
+import { updateAdminUser, AdminUser, deleteUserAvatar, UserRole } from '../services/api';
 import Avatar from './Avatar';
 import { XMarkIcon, TrashIcon } from '@heroicons/react/24/outline';
 
@@ -29,12 +29,12 @@ const UserEditModal = ({ user, onClose, onUserUpdated }: UserEditModalProps) => 
     try {
       const updates: {
         email?: string;
-        role?: string;
+        role?: UserRole;
         appCurrencyBalance?: number;
         password?: string;
       } = {
         email: formData.email,
-        role: formData.role,
+        role: formData.role as UserRole,
         appCurrencyBalance: parseInt(formData.appCurrencyBalance),
       };
 

@@ -52,7 +52,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
           // First try to get fresh user data from the backend
           const userData = await getCurrentUser();
-          setUser(userData);
+          setUser({
+            userId: userData.id,
+            email: userData.email,
+            role: userData.role,
+            appCurrencyBalance: userData.appCurrencyBalance,
+            avatarUrl: userData.avatarUrl,
+            theme: userData.theme
+          });
         } catch (error) {
           console.error('Failed to fetch fresh user data, falling back to JWT:', error);
           // Fallback to JWT token if API call fails

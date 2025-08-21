@@ -1,7 +1,5 @@
 import { Hono } from 'hono';
-import { apiKeyAuth } from './middleware/apiKeyAuth';
-import { adminAuth, jwtAuth } from './middleware/adminAuth';
-import { rateLimitMiddleware } from './middleware/rateLimiting';
+import { jwtAuth, adminHybridAuth, hybridAuth } from './middleware/auth';
 import {
   getVehicleImages,
   createImageContribution,
@@ -17,11 +15,8 @@ import { randomUUID } from 'crypto';
 
 const imagesRouter = new Hono();
 
-// Apply rate limiting to all image routes
-imagesRouter.use('*', rateLimitMiddleware);
-
-// Apply API key authentication to all routes
-imagesRouter.use('*', apiKeyAuth);
+// Apply hybrid authentication to all image routes
+imagesRouter.use('*', hybridAuth());
 
 // Get images for a specific vehicle
 imagesRouter.get('/vehicle/:vehicleId', async (c) => {
@@ -135,7 +130,7 @@ imagesRouter.get('/contributions/pending', jwtAuth, async (c) => {
 });
 
 // Approve an image contribution (admin only)
-imagesRouter.post('/contributions/:id/approve', ...adminAuth, async (c) => {
+imagesRouter.post('/contributions/:id/approve', adminHybridAuth, async (c) => {
   try {
     const contributionId = Number(c.req.param('id'));
     const userId = c.get('userId') as number;
@@ -159,7 +154,7 @@ imagesRouter.post('/contributions/:id/approve', ...adminAuth, async (c) => {
 });
 
 // Reject an image contribution (admin only)
-imagesRouter.post('/contributions/:id/reject', ...adminAuth, async (c) => {
+imagesRouter.post('/contributions/:id/reject', adminHybridAuth, async (c) => {
   try {
     const contributionId = Number(c.req.param('id'));
     const userId = c.get('userId') as number;
@@ -180,7 +175,7 @@ imagesRouter.post('/contributions/:id/reject', ...adminAuth, async (c) => {
 });
 
 // Delete a vehicle image (admin only)
-imagesRouter.delete('/:id', ...adminAuth, async (c) => {
+imagesRouter.delete('/:id', adminHybridAuth, async (c) => {
   try {
     const imageId = Number(c.req.param('id'));
 
@@ -198,7 +193,7 @@ imagesRouter.delete('/:id', ...adminAuth, async (c) => {
 });
 
 // Update image display order (admin only)
-imagesRouter.put('/vehicle/:vehicleId/order', ...adminAuth, async (c) => {
+imagesRouter.put('/vehicle/:vehicleId/order', adminHybridAuth, async (c) => {
   try {
     const vehicleId = Number(c.req.param('vehicleId'));
     const body = await c.req.json();

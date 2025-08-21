@@ -101,9 +101,9 @@ The EV Database is a modern web application that allows users to browse, contrib
 ### Default Users
 The application comes with pre-seeded users for testing:
 
-- **Admin**: `admin@example.com` / `password123`
-- **Moderator**: `moderator@example.com` / `password123`
-- **User**: `user@example.com` / `password123`
+- **Admin**: `admin@example.com` / `password`
+- **Moderator**: `moderator@example.com` / `password`
+- **User**: `user@example.com` / `password`
 
 ## 📁 Project Structure
 

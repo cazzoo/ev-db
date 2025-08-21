@@ -1,0 +1,1278 @@
+openapi: 3.0.3
+info:
+  title: EV Database API
+  description: |
+    A comprehensive API for managing electric vehicle data, contributions, and user interactions.
+
+    ## Authentication
+
+    This API supports two authentication methods:
+
+    ### 1. Frontend Authentication (JWT)
+    - Used by the frontend application
+    - Requires `X-Frontend-Secret` header with the frontend secret
+    - Uses JWT tokens for user authentication
+    - No rate limiting applied
+
+    ### 2. External API Authentication (API Key)
+    - Used by external applications and integrations
+    - Requires a valid API key in the `Authorization` header as `Bearer <api-key>`
+    - Subject to rate limiting based on user role
+    - Consumes API credits per request
+
+    ## Rate Limiting
+
+    API key requests are subject to rate limiting:
+    - **MEMBER**: 100 requests per hour
+    - **MODERATOR**: 500 requests per hour
+    - **ADMIN**: 1000 requests per hour
+
+    ## Error Responses
+
+    The API uses standard HTTP status codes and returns error responses in the following format:
+    ```json
+    {
+      "error": "Error message description"
+    }
+    ```
+
+  version: 1.0.0
+  contact:
+    name: EV Database API Support
+    email: support@evdatabase.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000/api
+    description: Development server
+  - url: https://api.evdatabase.com/api
+    description: Production server
+
+security:
+  - FrontendAuth: []
+  - ApiKeyAuth: []
+
+paths:
+  # Health and Info Endpoints
+  /:
+    get:
+      summary: API Health Check
+      description: Simple health check endpoint
+      tags: [General]
+      security: []
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Hello Hono!"
+
+  /info:
+    get:
+      summary: API Information
+      description: Get comprehensive API information including available endpoints
+      tags: [General]
+      security: []
+      responses:
+        '200':
+          description: API information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiInfo'
+
+  /test:
+    get:
+      summary: Test Endpoint
+      description: Test endpoint for API connectivity
+      tags: [General]
+      security: []
+      responses:
+        '200':
+          description: Test successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "API is working!"
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  # Statistics Endpoints
+  /stats:
+    get:
+      summary: Get API Statistics
+      description: Get comprehensive statistics about the database
+      tags: [Statistics]
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Statistics data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Statistics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /users:
+    get:
+      summary: Get All Users
+      description: Get a list of all users (requires API key authentication)
+      tags: [Users]
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  # Authentication Endpoints
+  /auth/register:
+    post:
+      summary: Register New User
+      description: Register a new user account
+      tags: [Authentication]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 6
+              required: [email, password]
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/UserPublic'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Email already exists"
+
+  /auth/login:
+    post:
+      summary: User Login
+      description: Authenticate user and receive JWT token
+      tags: [Authentication]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+              required: [email, password]
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: JWT token
+                  user:
+                    $ref: '#/components/schemas/UserPublic'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid credentials"
+
+  /auth/me:
+    get:
+      summary: Get Current User
+      description: Get current authenticated user information
+      tags: [Authentication]
+      security:
+        - FrontendAuth: []
+      responses:
+        '200':
+          description: Current user information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPublic'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # Vehicle Endpoints
+  /vehicles:
+    get:
+      summary: Get All Vehicles
+      description: Get a paginated list of all vehicles with optional filtering
+      tags: [Vehicles]
+      security: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number (1-based)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: search
+          in: query
+          description: Search term for make, model, or description
+          schema:
+            type: string
+        - name: make
+          in: query
+          description: Filter by vehicle make
+          schema:
+            type: string
+        - name: year
+          in: query
+          description: Filter by vehicle year
+          schema:
+            type: integer
+        - name: sortBy
+          in: query
+          description: Field to sort by
+          schema:
+            type: string
+            enum: [id, make, model, year, batteryCapacity, range]
+            default: id
+        - name: sortOrder
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+      responses:
+        '200':
+          description: List of vehicles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vehicles:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Vehicle'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      summary: Create New Vehicle
+      description: Create a new vehicle (admin only)
+      tags: [Vehicles]
+      security:
+        - FrontendAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VehicleInput'
+      responses:
+        '201':
+          description: Vehicle created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vehicle'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /vehicles/{id}:
+    get:
+      summary: Get Vehicle by ID
+      description: Get detailed information about a specific vehicle
+      tags: [Vehicles]
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Vehicle ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Vehicle details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehicleDetailed'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      summary: Update Vehicle
+      description: Update an existing vehicle (admin only)
+      tags: [Vehicles]
+      security:
+        - FrontendAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Vehicle ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VehicleInput'
+      responses:
+        '200':
+          description: Vehicle updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vehicle'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Delete Vehicle
+      description: Delete a vehicle (admin only)
+      tags: [Vehicles]
+      security:
+        - FrontendAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Vehicle ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Vehicle deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Vehicle deleted successfully"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # API Key Management Endpoints
+  /apikeys:
+    get:
+      summary: Get User's API Keys
+      description: Get all API keys for the authenticated user
+      tags: [API Keys]
+      security:
+        - FrontendAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: List of user's API keys
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApiKey'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      summary: Create New API Key
+      description: Create a new API key for the authenticated user
+      tags: [API Keys]
+      security:
+        - FrontendAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: API key name/description
+                expiresAt:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  description: Expiration date (null for no expiration)
+              required: [name]
+      responses:
+        '201':
+          description: API key created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  apiKey:
+                    $ref: '#/components/schemas/ApiKeyWithSecret'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /apikeys/{id}/revoke:
+    delete:
+      summary: Revoke API Key
+      description: Revoke an existing API key
+      tags: [API Keys]
+      security:
+        - FrontendAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: API key ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: API key revoked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "API key revoked successfully"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /apikeys/usage/daily:
+    get:
+      summary: Get API Usage Statistics
+      description: Get daily API usage statistics for the authenticated user
+      tags: [API Keys]
+      security:
+        - FrontendAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Daily usage statistics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DailyUsage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /apikeys/rate-limit-status:
+    get:
+      summary: Get Rate Limit Status
+      description: Get current rate limit status for the authenticated user
+      tags: [API Keys]
+      security:
+        - FrontendAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Rate limit status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # Contribution Endpoints
+  /contributions:
+    get:
+      summary: Get All Contributions
+      description: Get a paginated list of contributions with optional filtering
+      tags: [Contributions]
+      security: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number (1-based)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: status
+          in: query
+          description: Filter by contribution status
+          schema:
+            type: string
+            enum: [PENDING, APPROVED, REJECTED, CANCELLED]
+        - name: userId
+          in: query
+          description: Filter by user ID
+          schema:
+            type: integer
+        - name: sortBy
+          in: query
+          description: Field to sort by
+          schema:
+            type: string
+            enum: [id, createdAt, status]
+            default: createdAt
+        - name: sortOrder
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: List of contributions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contributions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Contribution'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      summary: Submit New Contribution
+      description: Submit a new vehicle contribution
+      tags: [Contributions]
+      security:
+        - FrontendAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContributionInput'
+      responses:
+        '201':
+          description: Contribution submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contribution'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /contributions/{id}:
+    get:
+      summary: Get Contribution by ID
+      description: Get detailed information about a specific contribution
+      tags: [Contributions]
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Contribution ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Contribution details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContributionDetailed'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /contributions/{id}/approve:
+    post:
+      summary: Approve Contribution
+      description: Approve a pending contribution (moderator/admin only)
+      tags: [Contributions]
+      security:
+        - FrontendAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Contribution ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Contribution approved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  contribution:
+                    $ref: '#/components/schemas/Contribution'
+                  vehicle:
+                    $ref: '#/components/schemas/Vehicle'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /contributions/{id}/reject:
+    post:
+      summary: Reject Contribution
+      description: Reject a pending contribution (moderator/admin only)
+      tags: [Contributions]
+      security:
+        - FrontendAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Contribution ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+                  description: Rejection reason/comment
+              required: [comment]
+      responses:
+        '200':
+          description: Contribution rejected successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  contribution:
+                    $ref: '#/components/schemas/Contribution'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    FrontendAuth:
+      type: apiKey
+      in: header
+      name: X-Frontend-Secret
+      description: Frontend secret for internal application use
+
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: API key for external access
+
+  schemas:
+    # Core Data Models
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique user identifier
+        email:
+          type: string
+          format: email
+          description: User email address
+        role:
+          type: string
+          enum: [MEMBER, MODERATOR, ADMIN]
+          description: User role
+        appCurrencyBalance:
+          type: integer
+          description: User's app currency balance
+        avatarUrl:
+          type: string
+          nullable: true
+          description: URL to user's avatar image
+        theme:
+          type: string
+          default: light
+          description: User's preferred theme
+      required: [id, email, role, appCurrencyBalance]
+
+    UserPublic:
+      type: object
+      description: Public user information (excludes sensitive data)
+      properties:
+        id:
+          type: integer
+          description: Unique user identifier
+        email:
+          type: string
+          format: email
+          description: User email address
+        role:
+          type: string
+          enum: [MEMBER, MODERATOR, ADMIN]
+          description: User role
+        appCurrencyBalance:
+          type: integer
+          description: User's app currency balance
+        avatarUrl:
+          type: string
+          nullable: true
+          description: URL to user's avatar image
+        theme:
+          type: string
+          default: light
+          description: User's preferred theme
+      required: [id, email, role, appCurrencyBalance]
+
+    Vehicle:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique vehicle identifier
+        make:
+          type: string
+          description: Vehicle manufacturer
+        model:
+          type: string
+          description: Vehicle model
+        year:
+          type: integer
+          description: Vehicle year
+        batteryCapacity:
+          type: integer
+          nullable: true
+          description: Battery capacity in kWh
+        range:
+          type: integer
+          nullable: true
+          description: Vehicle range in km
+        chargingSpeed:
+          type: integer
+          nullable: true
+          description: Charging speed in kW
+        description:
+          type: string
+          nullable: true
+          description: Vehicle description
+      required: [id, make, model, year]
+
+    VehicleInput:
+      type: object
+      description: Input schema for creating/updating vehicles
+      properties:
+        make:
+          type: string
+          description: Vehicle manufacturer
+        model:
+          type: string
+          description: Vehicle model
+        year:
+          type: integer
+          minimum: 1900
+          maximum: 2030
+          description: Vehicle year
+        batteryCapacity:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: Battery capacity in kWh
+        range:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: Vehicle range in km
+        chargingSpeed:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: Charging speed in kW
+        description:
+          type: string
+          nullable: true
+          description: Vehicle description
+      required: [make, model, year]
+
+    VehicleDetailed:
+      allOf:
+        - $ref: '#/components/schemas/Vehicle'
+        - type: object
+          properties:
+            images:
+              type: array
+              items:
+                $ref: '#/components/schemas/VehicleImage'
+              description: Vehicle images
+            contributionsCount:
+              type: integer
+              description: Number of contributions for this vehicle
+
+    VehicleImage:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Image ID
+        filename:
+          type: string
+          description: Image filename
+        url:
+          type: string
+          description: Image URL
+        altText:
+          type: string
+          nullable: true
+          description: Alternative text for accessibility
+        caption:
+          type: string
+          nullable: true
+          description: Image caption
+        displayOrder:
+          type: integer
+          description: Display order in carousel
+        uploadedAt:
+          type: string
+          format: date-time
+          description: Upload timestamp
+        isApproved:
+          type: boolean
+          description: Whether image is approved
+      required: [id, filename, url, displayOrder, uploadedAt, isApproved]
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          description: Current page number
+        limit:
+          type: integer
+          description: Items per page
+        total:
+          type: integer
+          description: Total number of items
+        totalPages:
+          type: integer
+          description: Total number of pages
+        hasNext:
+          type: boolean
+          description: Whether there is a next page
+        hasPrev:
+          type: boolean
+          description: Whether there is a previous page
+      required: [page, limit, total, totalPages, hasNext, hasPrev]
+
+    Statistics:
+      type: object
+      properties:
+        users:
+          type: integer
+          description: Total number of users
+        vehicles:
+          type: integer
+          description: Total number of vehicles
+        contributionsTotal:
+          type: integer
+          description: Total number of contributions
+        contributionsPending:
+          type: integer
+          description: Number of pending contributions
+        contributionsApproved:
+          type: integer
+          description: Number of approved contributions
+        contributionsRejected:
+          type: integer
+          description: Number of rejected contributions
+        contributorsCount:
+          type: integer
+          description: Number of unique contributors
+      required: [users, vehicles, contributionsTotal, contributionsPending, contributionsApproved, contributionsRejected, contributorsCount]
+
+    ApiKey:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: API key ID
+        name:
+          type: string
+          nullable: true
+          description: API key name/description
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Expiration date
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation date
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Revocation date
+      required: [id, createdAt]
+
+    ApiKeyWithSecret:
+      allOf:
+        - $ref: '#/components/schemas/ApiKey'
+        - type: object
+          properties:
+            key:
+              type: string
+              description: The actual API key (only shown once during creation)
+          required: [key]
+
+    DailyUsage:
+      type: object
+      properties:
+        day:
+          type: string
+          format: date
+          description: Date (YYYY-MM-DD)
+        count:
+          type: integer
+          description: Number of API calls on this day
+      required: [day, count]
+
+    RateLimitStatus:
+      type: object
+      properties:
+        limit:
+          type: integer
+          description: Rate limit per hour
+        remaining:
+          type: integer
+          description: Remaining requests in current window
+        resetTime:
+          type: string
+          format: date-time
+          description: When the rate limit resets
+        userRole:
+          type: string
+          enum: [MEMBER, MODERATOR, ADMIN]
+          description: User role affecting rate limits
+      required: [limit, remaining, resetTime, userRole]
+
+    Contribution:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Contribution ID
+        userId:
+          type: integer
+          description: ID of the user who submitted the contribution
+        vehicleData:
+          type: object
+          description: Vehicle data being contributed
+        status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED, CANCELLED]
+          description: Contribution status
+        changeType:
+          type: string
+          enum: [NEW, UPDATE]
+          description: Type of change (new vehicle or update to existing)
+        targetVehicleId:
+          type: integer
+          nullable: true
+          description: ID of vehicle being updated (for UPDATE type)
+        createdAt:
+          type: string
+          format: date-time
+          description: Submission date
+        approvedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Approval date
+        rejectedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Rejection date
+        rejectionComment:
+          type: string
+          nullable: true
+          description: Rejection reason/comment
+        rejectedBy:
+          type: integer
+          nullable: true
+          description: ID of user who rejected the contribution
+      required: [id, userId, vehicleData, status, changeType, createdAt]
+
+    ContributionDetailed:
+      allOf:
+        - $ref: '#/components/schemas/Contribution'
+        - type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/UserPublic'
+              description: User who submitted the contribution
+            votes:
+              type: array
+              items:
+                $ref: '#/components/schemas/ContributionVote'
+              description: Votes on this contribution
+            voteCount:
+              type: integer
+              description: Total vote count
+
+    ContributionInput:
+      type: object
+      properties:
+        vehicleData:
+          type: object
+          description: Vehicle data being contributed
+          properties:
+            make:
+              type: string
+            model:
+              type: string
+            year:
+              type: integer
+            batteryCapacity:
+              type: integer
+              nullable: true
+            range:
+              type: integer
+              nullable: true
+            chargingSpeed:
+              type: integer
+              nullable: true
+            description:
+              type: string
+              nullable: true
+          required: [make, model, year]
+        changeType:
+          type: string
+          enum: [NEW, UPDATE]
+          description: Type of change
+        targetVehicleId:
+          type: integer
+          nullable: true
+          description: ID of vehicle being updated (required for UPDATE type)
+      required: [vehicleData, changeType]
+
+    ContributionVote:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Vote ID
+        userId:
+          type: integer
+          description: ID of user who voted
+        vote:
+          type: integer
+          description: Vote value (+1 for upvote)
+      required: [id, userId, vote]
+
+    ApiInfo:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "EV Database API"
+        version:
+          type: string
+          example: "1.0.0"
+        description:
+          type: string
+        endpoints:
+          type: array
+          items:
+            type: object
+            properties:
+              path:
+                type: string
+              method:
+                type: string
+              description:
+                type: string
+
+  responses:
+    Unauthorized:
+      description: Authentication required or invalid credentials
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Authentication required"
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Admin access required"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Resource not found"
+
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Rate limit exceeded"
+
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Validation failed"
+
+tags:
+  - name: General
+    description: General API endpoints
+  - name: Statistics
+    description: API statistics and metrics
+  - name: Users
+    description: User management
+  - name: Vehicles
+    description: Vehicle data management
+  - name: Contributions
+    description: User contributions and proposals
+  - name: Authentication
+    description: User authentication and authorization
+  - name: API Keys
+    description: API key management
+  - name: Admin
+    description: Administrative functions
+  - name: Images
+    description: Image management
+  - name: Webhooks
+    description: Webhook configuration and management

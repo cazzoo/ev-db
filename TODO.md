@@ -10,7 +10,9 @@
 [x] Create a new way of displaying vehicles, using cards and flex layout, so it looks better.
 [x] Add image caption and alt text fields in the submission form (after image is selected).
 [x] Add comment field when we want to reject a contribution (that can be seen in user's dashboard's contributions).
-[] As admin, we need to be able to configure application settings, such as notifications, webhooks, email, ...etc.
+[x] As admin, we need to be able to configure application settings, such as notifications, webhooks, email, ...etc.
+[] Add audit trail for settings changes.
+[x] Add in-app notifications for important events (contribution approved/rejected, new message, ...etc.).
 [] Provide way to add custom fields to vehicles. The fields will be displayed into a specific step in the workflow form. We should have a way to retrieve all the available fields with the API. Sumitting a contribution with custom fields that's doesn't exist should work, we need to create the fields before. Custom fields can be administered by the admin, to rename it, determine if that is viewable from the vehicle card, vehicle details. The custom fields should be integrated the same way the other default fields (with live-edit in review, diff, ...etc.).
 [x] When clicking on a vehicle carrousel arrow, it displays the vehicle details and switches the image instead of just switching the image.
 [] I would like to have pagination for the vehicle retrieval, both the UI and API.
@@ -26,4 +28,4 @@
 [] Create dockerfile(s)/compose/stack to package/deploy this application.
 [] Add a monetezation mechanism for the users to top-up their credit balance. Use Wise business.
 [] Implement localization with i18n.
-[] Put in place TDD framework and feature tests to cover the application.
+[] Put in place TDD framework and Cypress framework to write tests and to cover the application functionalities.

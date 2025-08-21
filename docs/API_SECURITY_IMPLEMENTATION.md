@@ -40,16 +40,18 @@ if (frontendSecret === FRONTEND_SECRET) {
 **Usage**: Currently unused but available for strict API-only endpoints
 
 #### 3. Hybrid Authentication (`hybridAuth`)
-**Location**: `packages/backend/src/index.ts` (inline middleware)
-**Purpose**: Supports both JWT (frontend) and API key (external) authentication
-**Logic**:
-- If `X-Frontend-Secret` header matches: Use JWT authentication
-- Otherwise: Use API key authentication
+**Location**: `packages/backend/src/middleware/auth.ts`
+**Purpose**: Standardized middleware supporting both JWT (frontend) and API key (external) authentication
+**Features**:
+- Configurable role requirements (admin, moderator)
+- Optional rate limiting control
+- Consistent error handling
+**Usage**: `hybridAuth()`, `adminHybridAuth`, `moderatorHybridAuth`
 
 #### 4. JWT Authentication (`jwtAuth`)
-**Location**: `packages/backend/src/middleware/adminAuth.ts`
-**Purpose**: Traditional JWT token validation for frontend user sessions
-**Usage**: Combined with role checks for admin/moderator endpoints
+**Location**: `packages/backend/src/middleware/auth.ts`
+**Purpose**: Standard JWT token validation for frontend-only routes
+**Usage**: Frontend-only endpoints that require user authentication
 
 #### 5. Role-Based Middleware
 - `adminOnly`: Requires ADMIN role

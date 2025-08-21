@@ -83,6 +83,10 @@ const AdminDashboardPage = () => {
           <p className="text-base-content/70 mt-2">Manage users and monitor system statistics</p>
         </div>
         <div className="flex gap-2">
+          <Link to="/admin/settings" className="btn btn-secondary">
+            <Cog6ToothIcon className="h-5 w-5" />
+            Settings
+          </Link>
           <Link to="/admin/users" className="btn btn-primary">
             <UsersIcon className="h-5 w-5" />
             Manage Users
@@ -208,7 +212,11 @@ const AdminDashboardPage = () => {
       <div className="card bg-base-100 shadow-xl mb-8">
         <div className="card-body">
           <h2 className="card-title">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+            <Link to="/admin/settings" className="btn btn-outline btn-info">
+              <Cog6ToothIcon className="h-5 w-5" />
+              System Settings
+            </Link>
             <Link to="/admin/users" className="btn btn-outline btn-primary">
               <UsersIcon className="h-5 w-5" />
               Manage All Users

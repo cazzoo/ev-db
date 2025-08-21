@@ -9,7 +9,9 @@
     "build": "pnpm --filter frontend build",
     "test:backend": "pnpm --filter backend vitest run",
     "test:frontend": "pnpm --filter frontend vitest run",
-    "test:all": "pnpm run test:backend && pnpm run test:frontend"
+    "test:all": "pnpm run test:backend && pnpm run test:frontend",
+    "docs:serve": "node docs/serve-docs.js",
+    "docs:serve:port": "node docs/serve-docs.js 3001"
   },
   "keywords": ["electric-vehicles", "ev", "database", "react", "typescript", "hono", "daisyui"],
   "author": "",

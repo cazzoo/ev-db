@@ -4,6 +4,9 @@ description: "Example description"
 ---
 # Clean Code Guidelines
 
+## KISS
+- Keep It Simple, Stupid principle
+
 ## Constants Over Magic Numbers
 - Replace hard-coded values with named constants
 - Use descriptive constant names that explain the value's purpose
@@ -22,6 +25,7 @@ description: "Example description"
 ## Maintainability
 - Files should be approximatively 600 lines maximum
 - Avoid making complex logic
+- Refactor code often
 
 ## Single Responsibility
 - Each function should do exactly one thing
@@ -47,11 +51,13 @@ description: "Example description"
 - Refactor continuously
 - Fix technical debt early
 - Leave code cleaner than you found it
+- Remove any debugging logs introduced once issues fixed
 
 ## Testing
 - Write tests before fixing bugs
 - Keep tests readable and maintainable
 - Test edge cases and error conditions
+- Follow testing conventions/framework
 
 ## Version Control
 - Write clear commit messages

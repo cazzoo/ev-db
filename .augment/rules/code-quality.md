@@ -5,7 +5,11 @@ type: "always_apply"
 # Code Quality Guidelines
 
 ## Verify Information
-Always verify information before presenting it. Do not make assumptions or speculate without clear evidence.
+- Always verify information before presenting it. Do not make assumptions or speculate without clear evidence.
+- Check withing the project documentation for guidelines
+
+## Rules updates
+When new files, standards or guiding principles are added, ensure there are matching rules to instruct you to follow them
 
 ## File-by-File Changes
 Make changes file by file and give me a chance to spot mistakes.
@@ -29,7 +33,11 @@ Don't invent changes other than what's explicitly requested.
 Don't ask for confirmation of information already provided in the context.
 
 ## Preserve Existing Code
-Don't remove unrelated code or functionalities. Pay attention to preserving existing structures.
+- Don't remove unrelated code or functionalities. Pay attention to preserving existing structures.
+- Avoid spaghetti code
+
+## Backward compatibility
+Do not produce code that is backward compatible, there's no need of such
 
 ## Single Chunk Edits
 Provide all edits in a single chunk instead of multiple-step instructions or explanations for the same file.

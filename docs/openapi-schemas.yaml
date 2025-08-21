@@ -1,0 +1,345 @@
+# Additional schemas for admin and webhook functionality
+
+UserAdmin:
+  type: object
+  description: User information with admin-visible fields
+  properties:
+    id:
+      type: integer
+      description: Unique user identifier
+    email:
+      type: string
+      format: email
+      description: User email address
+    role:
+      type: string
+      enum: [MEMBER, MODERATOR, ADMIN]
+      description: User role
+    appCurrencyBalance:
+      type: integer
+      description: User's app currency balance
+    avatarUrl:
+      type: string
+      nullable: true
+      description: URL to user's avatar image
+    theme:
+      type: string
+      default: light
+      description: User's preferred theme
+    createdAt:
+      type: string
+      format: date-time
+      description: Account creation date
+    lastLoginAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: Last login date
+  required: [id, email, role, appCurrencyBalance]
+
+Webhook:
+  type: object
+  properties:
+    id:
+      type: integer
+      description: Webhook ID
+    name:
+      type: string
+      description: Webhook name
+    description:
+      type: string
+      nullable: true
+      description: Webhook description
+    url:
+      type: string
+      format: uri
+      description: Webhook URL
+    method:
+      type: string
+      enum: [POST, PUT, PATCH]
+      default: POST
+      description: HTTP method
+    contentType:
+      type: string
+      default: application/json
+      description: Content type
+    authType:
+      type: string
+      enum: [none, bearer, basic, api_key, custom]
+      default: none
+      description: Authentication type
+    timeout:
+      type: integer
+      default: 30
+      description: Timeout in seconds
+    retryAttempts:
+      type: integer
+      default: 3
+      description: Number of retry attempts
+    retryDelay:
+      type: integer
+      default: 5
+      description: Delay between retries in seconds
+    enabledEvents:
+      type: array
+      items:
+        type: string
+      description: List of enabled event types
+    isEnabled:
+      type: boolean
+      default: true
+      description: Whether webhook is enabled
+    lastTriggered:
+      type: string
+      format: date-time
+      nullable: true
+      description: Last trigger timestamp
+    successCount:
+      type: integer
+      default: 0
+      description: Number of successful deliveries
+    failureCount:
+      type: integer
+      default: 0
+      description: Number of failed deliveries
+    createdAt:
+      type: string
+      format: date-time
+      description: Creation timestamp
+    updatedAt:
+      type: string
+      format: date-time
+      description: Last update timestamp
+  required: [id, name, url, method, contentType, authType, timeout, retryAttempts, retryDelay, enabledEvents, isEnabled, successCount, failureCount, createdAt, updatedAt]
+
+WebhookInput:
+  type: object
+  properties:
+    name:
+      type: string
+      description: Webhook name
+    description:
+      type: string
+      nullable: true
+      description: Webhook description
+    url:
+      type: string
+      format: uri
+      description: Webhook URL
+    method:
+      type: string
+      enum: [POST, PUT, PATCH]
+      default: POST
+      description: HTTP method
+    contentType:
+      type: string
+      default: application/json
+      description: Content type
+    authType:
+      type: string
+      enum: [none, bearer, basic, api_key, custom]
+      default: none
+      description: Authentication type
+    authToken:
+      type: string
+      nullable: true
+      description: Bearer token or API key
+    authUsername:
+      type: string
+      nullable: true
+      description: Basic auth username
+    authPassword:
+      type: string
+      nullable: true
+      description: Basic auth password
+    authHeaderName:
+      type: string
+      nullable: true
+      description: Custom header name for API key
+    secret:
+      type: string
+      nullable: true
+      description: HMAC secret for signature verification
+    timeout:
+      type: integer
+      default: 30
+      minimum: 1
+      maximum: 300
+      description: Timeout in seconds
+    retryAttempts:
+      type: integer
+      default: 3
+      minimum: 0
+      maximum: 10
+      description: Number of retry attempts
+    retryDelay:
+      type: integer
+      default: 5
+      minimum: 1
+      maximum: 300
+      description: Delay between retries in seconds
+    enabledEvents:
+      type: array
+      items:
+        type: string
+        enum:
+          - contribution.submitted
+          - contribution.approved
+          - contribution.rejected
+          - user.registered
+          - vehicle.created
+          - vehicle.updated
+      description: List of enabled event types
+    eventFilters:
+      type: object
+      nullable: true
+      description: Additional event filters (JSON object)
+    customHeaders:
+      type: object
+      nullable: true
+      description: Custom headers (JSON object)
+    payloadTemplate:
+      type: string
+      nullable: true
+      description: Custom payload template
+    isEnabled:
+      type: boolean
+      default: true
+      description: Whether webhook is enabled
+  required: [name, url]
+
+AdminSettings:
+  type: object
+  properties:
+    id:
+      type: integer
+      description: Setting ID
+    category:
+      type: string
+      enum: [NOTIFICATIONS, WEBHOOKS, EMAIL, API, SYSTEM, PUSH_NOTIFICATIONS, SMS, TEAMS, SLACK, DISCORD, GOTIFY, PUSHBULLET, FCM, APNS, WEB_PUSH, RSS]
+      description: Setting category
+    key:
+      type: string
+      description: Setting key
+    value:
+      type: string
+      nullable: true
+      description: Setting value (JSON string for complex values)
+    dataType:
+      type: string
+      enum: [STRING, NUMBER, BOOLEAN, JSON, PASSWORD]
+      default: STRING
+      description: Data type
+    description:
+      type: string
+      nullable: true
+      description: Setting description
+    isEncrypted:
+      type: boolean
+      default: false
+      description: Whether value is encrypted
+    validationRules:
+      type: string
+      nullable: true
+      description: Validation rules (JSON string)
+    defaultValue:
+      type: string
+      nullable: true
+      description: Default value
+    isActive:
+      type: boolean
+      default: true
+      description: Whether setting is active
+    version:
+      type: integer
+      default: 1
+      description: Setting version
+    createdAt:
+      type: string
+      format: date-time
+      description: Creation timestamp
+    updatedAt:
+      type: string
+      format: date-time
+      description: Last update timestamp
+  required: [id, category, key, dataType, isEncrypted, isActive, version, createdAt, updatedAt]
+
+NotificationPreference:
+  type: object
+  properties:
+    id:
+      type: integer
+      description: Preference ID
+    userId:
+      type: integer
+      description: User ID
+    channel:
+      type: string
+      enum: [EMAIL, WEBHOOK, PUSH, SMS, IN_APP]
+      description: Notification channel
+    eventType:
+      type: string
+      enum:
+        - contribution.approved
+        - contribution.rejected
+        - contribution.submitted
+        - user.registered
+        - user.password_reset
+        - user.account_updated
+        - system.maintenance
+        - system.announcement
+      description: Event type
+    enabled:
+      type: boolean
+      default: true
+      description: Whether notifications are enabled for this channel/event
+    createdAt:
+      type: string
+      format: date-time
+      description: Creation timestamp
+    updatedAt:
+      type: string
+      format: date-time
+      description: Last update timestamp
+  required: [id, userId, channel, eventType, enabled, createdAt, updatedAt]
+
+InAppNotification:
+  type: object
+  properties:
+    id:
+      type: integer
+      description: Notification ID
+    userId:
+      type: integer
+      description: User ID
+    title:
+      type: string
+      description: Notification title
+    content:
+      type: string
+      description: Notification content
+    eventType:
+      type: string
+      description: Event type that triggered the notification
+    isRead:
+      type: boolean
+      default: false
+      description: Whether notification has been read
+    readAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: When notification was read
+    actionUrl:
+      type: string
+      nullable: true
+      description: URL for notification action
+    metadata:
+      type: object
+      nullable: true
+      description: Additional metadata (JSON object)
+    createdAt:
+      type: string
+      format: date-time
+      description: Creation timestamp
+  required: [id, userId, title, content, eventType, isRead, createdAt]

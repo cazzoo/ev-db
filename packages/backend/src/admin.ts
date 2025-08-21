@@ -6,6 +6,15 @@ import { adminAuth } from './middleware/adminAuth';
 import bcrypt from 'bcryptjs';
 import { promises as fs } from 'fs';
 import path from 'path';
+import {
+  getSettingsByCategory,
+  getSetting,
+  updateSetting,
+  getSettingAuditTrail,
+  exportSettings,
+  createOrUpdateSetting,
+  seedDefaultSettings
+} from './services/settingsService';
 
 const adminRouter = new Hono();
 
@@ -149,6 +158,12 @@ adminRouter.put('/users/:id', async (c) => {
       }
     }
 
+    // Get current user data for credit comparison
+    const [currentUser] = await db.select().from(users).where(eq(users.id, id));
+    if (!currentUser) {
+      return c.json({ error: 'User not found' }, 404);
+    }
+
     // Prepare update data
     const updateData: any = {};
     if (email !== undefined) updateData.email = email;
@@ -171,6 +186,23 @@ adminRouter.put('/users/:id', async (c) => {
 
     if (updatedUser.length === 0) {
       return c.json({ error: 'User not found' }, 404);
+    }
+
+    // Send credit top-up notification if credits were added
+    if (appCurrencyBalance !== undefined && parseInt(appCurrencyBalance) > currentUser.appCurrencyBalance) {
+      try {
+        const { AutomatedNotifications } = await import('./services/automatedNotifications');
+        const creditsAdded = parseInt(appCurrencyBalance) - currentUser.appCurrencyBalance;
+        await AutomatedNotifications.sendCreditTopUpConfirmation(
+          id,
+          creditsAdded,
+          'for admin adjustment',
+          parseInt(appCurrencyBalance)
+        );
+      } catch (notificationError) {
+        console.error('Failed to send credit top-up notification:', notificationError);
+        // Don't fail the update if notification fails
+      }
     }
 
     return c.json({ message: 'User updated successfully', user: updatedUser[0] });
@@ -544,6 +576,253 @@ adminRouter.delete('/dev/wipe-contributions', async (c) => {
     });
   } catch (error) {
     console.error('Error wiping contributions:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// ===== ADMIN SETTINGS ROUTES =====
+
+// Get all settings or by category
+adminRouter.get('/settings', async (c) => {
+  try {
+    const category = c.req.query('category');
+    const settings = await getSettingsByCategory(category);
+    return c.json({ settings });
+  } catch (error) {
+    console.error('Error fetching settings:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Get specific setting by category and key
+adminRouter.get('/settings/:category/:key', async (c) => {
+  try {
+    const category = c.req.param('category');
+    const key = c.req.param('key');
+
+    const setting = await getSetting(category, key);
+    if (!setting) {
+      return c.json({ error: 'Setting not found' }, 404);
+    }
+
+    return c.json({ setting });
+  } catch (error) {
+    console.error('Error fetching setting:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Public endpoint to check maintenance mode status (no auth required)
+adminRouter.get('/maintenance-status', async (c) => {
+  try {
+    const maintenanceSetting = await getSetting('SYSTEM', 'maintenance_mode');
+    const isMaintenanceMode = maintenanceSetting?.value === 'true';
+
+    return c.json({
+      isMaintenanceMode,
+      message: isMaintenanceMode
+        ? 'The system is currently under maintenance. Please try again later.'
+        : 'System is operational'
+    });
+  } catch (error) {
+    console.error('Error checking maintenance status:', error);
+    // If we can't check maintenance mode, assume it's off to prevent lockout
+    return c.json({
+      isMaintenanceMode: false,
+      message: 'System is operational'
+    });
+  }
+});
+
+// Update setting value
+adminRouter.put('/settings/:id', async (c) => {
+  try {
+    const settingId = parseInt(c.req.param('id'));
+    const payload = c.get('jwtPayload');
+    const { value } = await c.req.json();
+
+    if (isNaN(settingId)) {
+      return c.json({ error: 'Invalid setting ID' }, 400);
+    }
+
+    // Get client IP and user agent for audit trail
+    const ipAddress = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+    const userAgent = c.req.header('user-agent') || 'unknown';
+
+    await updateSetting(settingId, value, payload.userId, ipAddress, userAgent);
+
+    return c.json({ message: 'Setting updated successfully' });
+  } catch (error) {
+    console.error('Error updating setting:', error);
+    return c.json({
+      error: error instanceof Error ? error.message : 'Internal server error'
+    }, 500);
+  }
+});
+
+// Bulk update settings
+adminRouter.post('/settings/bulk', async (c) => {
+  try {
+    const payload = c.get('jwtPayload');
+    const { updates } = await c.req.json();
+
+    if (!Array.isArray(updates)) {
+      return c.json({ error: 'Updates must be an array' }, 400);
+    }
+
+    const ipAddress = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+    const userAgent = c.req.header('user-agent') || 'unknown';
+
+    const results = [];
+    const errors = [];
+
+    for (const update of updates) {
+      try {
+        if (!update.id || update.value === undefined) {
+          errors.push({ id: update.id, error: 'Missing id or value' });
+          continue;
+        }
+
+        await updateSetting(update.id, update.value, payload.userId, ipAddress, userAgent);
+        results.push({ id: update.id, success: true });
+      } catch (error) {
+        errors.push({
+          id: update.id,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    return c.json({
+      message: 'Bulk update completed',
+      results,
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (error) {
+    console.error('Error in bulk update:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Get audit trail for a setting
+adminRouter.get('/settings/:id/audit', async (c) => {
+  try {
+    const settingId = parseInt(c.req.param('id'));
+    const limit = parseInt(c.req.query('limit') || '50');
+
+    if (isNaN(settingId)) {
+      return c.json({ error: 'Invalid setting ID' }, 400);
+    }
+
+    const auditTrail = await getSettingAuditTrail(settingId, limit);
+    return c.json({ auditTrail });
+  } catch (error) {
+    console.error('Error fetching audit trail:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Export settings for backup
+adminRouter.get('/settings/export', async (c) => {
+  try {
+    const exportData = await exportSettings();
+
+    // Set headers for file download
+    c.header('Content-Type', 'application/json');
+    c.header('Content-Disposition', `attachment; filename="admin-settings-${new Date().toISOString().split('T')[0]}.json"`);
+
+    return c.json(exportData);
+  } catch (error) {
+    console.error('Error exporting settings:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Import settings from backup (Admin only)
+adminRouter.post('/settings/import', async (c) => {
+  const payload = c.get('jwtPayload');
+  if (payload.role !== 'ADMIN') {
+    return c.json({ error: 'Unauthorized: Admin access required' }, 403);
+  }
+
+  try {
+    const { settings, overwrite = false } = await c.req.json();
+
+    if (!Array.isArray(settings)) {
+      return c.json({ error: 'Settings must be an array' }, 400);
+    }
+
+    const results = [];
+    const errors = [];
+
+    for (const setting of settings) {
+      try {
+        if (!setting.category || !setting.key || !setting.dataType) {
+          errors.push({
+            setting: `${setting.category}.${setting.key}`,
+            error: 'Missing required fields'
+          });
+          continue;
+        }
+
+        // Skip encrypted values in import
+        if (setting.value === '[ENCRYPTED]') {
+          results.push({
+            setting: `${setting.category}.${setting.key}`,
+            status: 'skipped',
+            reason: 'Encrypted value not imported'
+          });
+          continue;
+        }
+
+        await createOrUpdateSetting(
+          setting.category,
+          setting.key,
+          setting.value,
+          setting.dataType,
+          setting.description || '',
+          payload.userId,
+          {
+            validationRules: setting.validationRules,
+            defaultValue: setting.defaultValue
+          }
+        );
+
+        results.push({
+          setting: `${setting.category}.${setting.key}`,
+          status: 'imported'
+        });
+      } catch (error) {
+        errors.push({
+          setting: `${setting.category}.${setting.key}`,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    return c.json({
+      message: 'Import completed',
+      results,
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (error) {
+    console.error('Error importing settings:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Seed default settings (Admin only, development)
+adminRouter.post('/settings/seed', async (c) => {
+  const payload = c.get('jwtPayload');
+  if (payload.role !== 'ADMIN') {
+    return c.json({ error: 'Unauthorized: Admin access required' }, 403);
+  }
+
+  try {
+    await seedDefaultSettings(payload.userId);
+    return c.json({ message: 'Default settings seeded successfully' });
+  } catch (error) {
+    console.error('Error seeding default settings:', error);
     return c.json({ error: 'Internal server error' }, 500);
   }
 });

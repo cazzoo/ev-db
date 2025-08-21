@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "5",
-      "when": 1754907404139,
-      "tag": "0000_talented_mastermind",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1755167612804,
-      "tag": "0001_eager_hex",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "5",
-      "when": 1755209848687,
-      "tag": "0002_sad_unicorn",
+      "when": 1755779466622,
+      "tag": "0000_wonderful_wallow",
       "breakpoints": true
     }
   ]

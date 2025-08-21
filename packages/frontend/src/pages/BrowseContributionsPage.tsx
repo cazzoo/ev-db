@@ -3,7 +3,8 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import DataTable, { Column } from '../components/DataTable';
 import VehicleImageCarousel from '../components/VehicleImageCarousel';
-import RejectionHistory from '../components/RejectionHistory';
+import { checkMaintenanceMode } from '../services/api';
+
 import {
   fetchPendingContributions,
   fetchAllContributions,
@@ -17,6 +18,7 @@ import {
   Vehicle,
   ImageContribution,
   fetchVehicles,
+  getUploadUrl,
 } from '../services/api';
 
 // Enhanced inline editable field component with improved UX
@@ -188,7 +190,7 @@ const InlineEditableVehicleDetails = ({
                 <VehicleImageCarousel
                   images={imageContributions.map(img => ({
                     id: img.id,
-                    url: `http://localhost:3000/uploads/${img.path}`,
+                    url: getUploadUrl(img.path) || '',
                     altText: img.altText,
                     caption: img.caption
                   }))}
@@ -206,7 +208,7 @@ const InlineEditableVehicleDetails = ({
                   <div key={img.id} className="text-center">
                     <div className="aspect-video bg-base-300 rounded overflow-hidden mb-1">
                       <img
-                        src={`http://localhost:3000/uploads/${img.path}`}
+                        src={getUploadUrl(img.path) || ''}
                         alt={img.altText || `Image ${index + 1}`}
                         className="w-full h-full object-cover"
                       />
@@ -339,7 +341,7 @@ const InlineEditableVehicleDetails = ({
               <VehicleImageCarousel
                 images={imageContributions.map(img => ({
                   id: img.id,
-                  url: `http://localhost:3000/uploads/${img.path}`,
+                  url: getUploadUrl(img.path) || '',
                   altText: img.altText,
                   caption: img.caption
                 }))}
@@ -359,7 +361,7 @@ const InlineEditableVehicleDetails = ({
                 <div key={img.id} className="text-center">
                   <div className="aspect-video bg-base-300 rounded overflow-hidden mb-2">
                     <img
-                      src={`http://localhost:3000/uploads/${img.path}`}
+                      src={getUploadUrl(img.path) || ''}
                       alt={img.altText || `Image ${index + 1}`}
                       className="w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer"
                       title={img.altText || `Image ${index + 1}`}
@@ -530,23 +532,14 @@ const [rejectError, setRejectError] = useState<string | null>(null);
   // Function to load image contributions for a specific contribution
   const loadImageContributions = useCallback(async (contribution: Contribution) => {
     try {
-      console.log('🔍 Loading image contributions for contribution:', contribution.id);
-      console.log('   - Change type:', contribution.changeType);
-      console.log('   - Target vehicle ID:', contribution.targetVehicleId);
-      console.log('   - Vehicle data ID:', contribution.vehicleData?.id);
-
       // For now, fetch all pending image contributions and filter by vehicle
       // In a full implementation, you'd want a specific API endpoint for this
       const allImageContribs = await fetchPendingImageContributions();
-      console.log('📸 Fetched all image contributions:', allImageContribs.length);
 
       // Filter image contributions by contribution ID (more accurate than vehicle ID)
-      console.log('🎯 Looking for images linked to contribution ID:', contribution.id);
-
       const relevantImages = allImageContribs.filter(img => {
         // First try to match by contribution ID (new linking method)
         if (img.contributionId === contribution.id) {
-          console.log(`   - Image ${img.id} (contribution ${img.contributionId}): ✅ DIRECT MATCH`);
           return true;
         }
 
@@ -554,15 +547,12 @@ const [rejectError, setRejectError] = useState<string | null>(null);
         const vehicleId = contribution.targetVehicleId || contribution.vehicleData.id;
         const matches = img.vehicleId === vehicleId || (img.vehicleId === contribution.vehicleData.id);
         if (matches && !img.contributionId) {
-          console.log(`   - Image ${img.id} (vehicle ${img.vehicleId}, no contribution link): ⚠️ FALLBACK MATCH`);
           return true;
         }
 
-        console.log(`   - Image ${img.id}: ❌ no match`);
         return false;
       });
 
-      console.log('🖼️ Found relevant images:', relevantImages.length);
       setImageContributions(relevantImages);
     } catch (error) {
       console.error('Failed to load image contributions:', error);
@@ -570,12 +560,9 @@ const [rejectError, setRejectError] = useState<string | null>(null);
     }
   }, []);
 
-  // Debug effect to track imageContributions changes
+  // Track imageContributions changes
   useEffect(() => {
-    console.log('🖼️ Image contributions state updated:', imageContributions.length);
-    imageContributions.forEach((img, index) => {
-      console.log(`   ${index + 1}. ${img.originalFilename} (ID: ${img.id}, Vehicle: ${img.vehicleId})`);
-    });
+    // Image contributions updated
   }, [imageContributions]);
 
   // Reset processed auto-open when location changes
@@ -603,7 +590,6 @@ const [rejectError, setRejectError] = useState<string | null>(null);
         window.history.replaceState({}, '', location.pathname);
       } else if (state?.openContributionId) {
         // Contribution not found (likely approved/rejected), clear the state
-        console.log('🚫 Contribution not found (likely approved/rejected):', state.openContributionId);
         processedAutoOpenRef.current = state.openContributionId;
         window.history.replaceState({}, '', location.pathname);
       }
@@ -620,17 +606,19 @@ const [rejectError, setRejectError] = useState<string | null>(null);
       ]);
       // contribData is used for pending contributions (public display), allContribData for all contributions (finding related proposals)
       setPendingContributions(contribData);
-      setAllContributions(allContribData);
+      // Extract data from paginated response
+      setAllContributions(allContribData.data || []);
       setAllVehicles(vehiclesData);
 
       const locationState = location.state as { openContributionId?: number };
       if (locationState?.openContributionId) {
         // First try to find in pending contributions, then in all contributions
+        const allContribArray = allContribData.data || [];
         const contribToOpen = contribData.find(c => c.id === locationState.openContributionId) ||
-                             allContribData.find(c => c.id === locationState.openContributionId);
+                             allContribArray.find(c => c.id === locationState.openContributionId);
         if (contribToOpen) {
           // Call handleShowDiff directly with the data to avoid dependency issues
-          const contributionsToSearch = allContribData;
+          const contributionsToSearch = allContribArray;
           const related = getRelatedProposals(contribToOpen, contributionsToSearch, vehiclesData);
           setRelatedProposals(related);
 
@@ -669,6 +657,31 @@ const [rejectError, setRejectError] = useState<string | null>(null);
       setIsSubmitting(false);
     }
   }, [loadData]);
+
+  // Wrapper functions to match expected signature
+  const handleApproveContribution = useCallback(async (id: number): Promise<void> => {
+    await approveContribution(id);
+  }, []);
+
+  const handleVoteOnContribution = useCallback(async (id: number): Promise<void> => {
+    // Check maintenance mode before allowing voting
+    const { isMaintenanceMode } = await checkMaintenanceMode();
+    if (isMaintenanceMode && user?.role !== 'ADMIN' && user?.role !== 'MODERATOR') {
+      alert('The contribution system is currently under maintenance. Voting is temporarily disabled.');
+      return;
+    }
+    await voteOnContribution(id);
+  }, [user?.role]);
+
+  const handleCancelMyContribution = useCallback(async (id: number): Promise<void> => {
+    // Check maintenance mode before allowing cancellation
+    const { isMaintenanceMode } = await checkMaintenanceMode();
+    if (isMaintenanceMode && user?.role !== 'ADMIN' && user?.role !== 'MODERATOR') {
+      alert('The contribution system is currently under maintenance. Canceling contributions is temporarily disabled.');
+      return;
+    }
+    await cancelMyContribution(id);
+  }, [user?.role]);
 
   // Helper function to find the best reference vehicle for comparison
   const findReferenceVehicle = (proposal: Contribution, vehicles?: Vehicle[]): Vehicle | null => {
@@ -988,7 +1001,7 @@ const [rejectError, setRejectError] = useState<string | null>(null);
                 className="btn btn-success btn-sm"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleModalAction(approveContribution, contribution.id);
+                  handleModalAction(handleApproveContribution, contribution.id);
                 }}
               >
                 Approve
@@ -1280,7 +1293,7 @@ const [rejectError, setRejectError] = useState<string | null>(null);
                 {selectedContribution && isAuthenticated && (
                   <>
                     {user?.userId !== selectedContribution.userId && (
-                      <button className="btn btn-primary btn-sm" onClick={() => handleModalAction(voteOnContribution, selectedContribution.id)} disabled={isSubmitting}>
+                      <button className="btn btn-primary btn-sm" onClick={() => handleModalAction(handleVoteOnContribution, selectedContribution.id)} disabled={isSubmitting}>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
                         </svg>
@@ -1332,7 +1345,7 @@ const [rejectError, setRejectError] = useState<string | null>(null);
                         </button>
                           </>
                         )}
-                        <button className="btn btn-error btn-sm" onClick={() => handleModalAction(cancelMyContribution, selectedContribution.id)} disabled={isSubmitting}>
+                        <button className="btn btn-error btn-sm" onClick={() => handleModalAction(handleCancelMyContribution, selectedContribution.id)} disabled={isSubmitting}>
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
@@ -1340,9 +1353,9 @@ const [rejectError, setRejectError] = useState<string | null>(null);
                         </button>
                       </>
                     )}
-                    {(user?.role === 'ADMIN' || (user?.role === 'MODERATOR' && user?.userId !== selectedContribution.userId)) && (
+                    {selectedContribution && (user?.role === 'ADMIN' || (user?.role === 'MODERATOR' && user?.userId !== selectedContribution.userId)) && (
                       <>
-                        <button className="btn btn-success btn-sm" onClick={() => handleModalAction(approveContribution, selectedContribution.id)} disabled={isSubmitting}>
+                        <button className="btn btn-success btn-sm" onClick={() => selectedContribution && handleModalAction(handleApproveContribution, selectedContribution.id)} disabled={isSubmitting}>
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>

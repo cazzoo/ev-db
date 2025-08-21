@@ -3,7 +3,8 @@ import { db } from './db';
 import { users } from './db/schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
-import { sign, jwt } from 'hono/jwt';
+import { sign } from 'hono/jwt';
+import { jwtAuth } from './middleware/auth';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -39,6 +40,18 @@ auth.post('/register', async (c) => {
       appCurrencyBalance: 0,
       avatarUrl: null,
     }).returning();
+
+    // Send welcome notification asynchronously
+    try {
+      const { AutomatedNotifications } = await import('./services/automatedNotifications');
+      // Send welcome notification after a short delay
+      setTimeout(() => {
+        AutomatedNotifications.sendWelcomeNotification(newUser[0].id);
+      }, 5000); // 5 second delay
+    } catch (notificationError) {
+      console.error('Failed to send welcome notification:', notificationError);
+      // Don't fail registration if notification fails
+    }
 
     return c.json({ message: 'User registered successfully', user: newUser[0] }, 201);
   } catch (error) {
@@ -80,7 +93,7 @@ auth.post('/login', async (c) => {
 });
 
 // Get current user data (authenticated)
-auth.use('/me', jwt({ secret: JWT_SECRET }));
+auth.use('/me', jwtAuth);
 auth.get('/me', async (c) => {
   try {
     const payload = c.get('jwtPayload');
@@ -92,7 +105,7 @@ auth.get('/me', async (c) => {
     }
 
     const userData = {
-      userId: user[0].id,
+      id: user[0].id,
       email: user[0].email,
       role: user[0].role,
       appCurrencyBalance: user[0].appCurrencyBalance,
@@ -146,8 +159,8 @@ auth.get('/avatar/:filename', async (c) => {
 });
 
 // Avatar upload endpoint (authenticated)
-auth.use('/avatar/upload', jwt({ secret: JWT_SECRET }));
-auth.use('/avatar', jwt({ secret: JWT_SECRET })); // Only for DELETE
+auth.use('/avatar/upload', jwtAuth);
+auth.use('/avatar', jwtAuth); // Only for DELETE
 
 auth.post('/avatar/upload', async (c) => {
     try {
@@ -209,7 +222,7 @@ auth.post('/avatar/upload', async (c) => {
 
 
 // Delete avatar endpoint
-auth.delete('/avatar', jwt({ secret: JWT_SECRET }), async (c) => {
+auth.delete('/avatar', jwtAuth, async (c) => {
   try {
     const payload = c.get('jwtPayload');
     const userId = payload.userId;
@@ -246,7 +259,7 @@ auth.delete('/avatar', jwt({ secret: JWT_SECRET }), async (c) => {
 });
 
 // Update user preferences (authenticated)
-auth.use('/preferences', jwt({ secret: JWT_SECRET }));
+auth.use('/preferences', jwtAuth);
 auth.put('/preferences', async (c) => {
   try {
     const payload = c.get('jwtPayload');

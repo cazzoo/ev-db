@@ -39,9 +39,9 @@ const UserManagementPage = () => {
         1,
         1000, // Large page size to get all users
         search || undefined,
-        roleFilter || undefined,
+        (roleFilter as any) || undefined,
         sortBy,
-        sortOrder
+        sortOrder as 'asc' | 'desc'
       );
       setUsers(data.users);
       setError(null);

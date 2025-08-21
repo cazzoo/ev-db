@@ -2,11 +2,9 @@ import { Hono } from 'hono';
 import { db, sqlClient } from './db';
 import { contributions, users, contributionReviews, vehicles, imageContributions, vehicleImages, moderationLogs } from './db/schema';
 import { eq, and, count, sql, or } from 'drizzle-orm';
-import { jwt } from 'hono/jwt';
-import { apiKeyAuth } from './middleware/apiKeyAuth';
-import { moderatorAuth } from './middleware/adminAuth';
-import { rateLimitMiddleware } from './middleware/rateLimiting';
+import { jwtAuth, moderatorHybridAuth, hybridAuth } from './middleware/auth';
 import { checkForDuplicate, deductContributionCredit, VehicleData } from './services/vehicleDuplicateService';
+import { contributionMaintenanceModeMiddleware } from './middleware/maintenanceMode';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -15,13 +13,10 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 
 const contributionsRouter = new Hono();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
-// Middleware to protect routes for authenticated users
-const userAuth = jwt({ secret: JWT_SECRET });
 
 // Real-time duplicate check endpoint (for UI feedback)
-contributionsRouter.post('/check-duplicate', userAuth, async (c) => {
+contributionsRouter.post('/check-duplicate', jwtAuth, contributionMaintenanceModeMiddleware, async (c) => {
   try {
     const { make, model, year, batteryCapacity, range, chargingSpeed } = await c.req.json();
 
@@ -38,8 +33,7 @@ contributionsRouter.post('/check-duplicate', userAuth, async (c) => {
   }
 });
 
-// Apply API key authentication and rate limiting to all contribution routes
-contributionsRouter.use('*', apiKeyAuth, rateLimitMiddleware);
+// Authentication is now handled per route with appropriate middleware
 
 // Ensure columns exist for change tracking (idempotent in dev)
 let ensured = false;
@@ -102,7 +96,7 @@ const ensureChangeColumns = async () => {
 }
 
 // Submit a new contribution (Authenticated users only)
-contributionsRouter.post('/', userAuth, async (c) => {
+contributionsRouter.post('/', jwtAuth, contributionMaintenanceModeMiddleware, async (c) => {
   await ensureChangeColumns();
   const payload = c.get('jwtPayload');
   const userId = payload.userId;
@@ -178,6 +172,79 @@ contributionsRouter.post('/', userAuth, async (c) => {
       createdAt: new Date(),
     }).returning();
 
+    // Send notification for contribution submission
+    try {
+      const { NotificationService } = await import('./services/notificationService');
+      const templates = NotificationService.getNotificationTemplates();
+
+      // Get contributor details
+      const [contributor] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+
+      if (contributor?.email) {
+        // Send confirmation to the contributor
+        await NotificationService.queueNotificationForUsers(
+          [userId],
+          'IN_APP',
+          'contribution.submitted',
+          templates['contribution.submitted']['IN_APP'],
+          {
+            vehicleData: vehicleData,
+            contributionId: newContribution[0].id,
+            timestamp: new Date().toISOString(),
+            user: { email: contributor.email }
+          }
+        );
+
+        // Notify admins/moderators about new contribution
+        const adminUsers = await db.select({ id: users.id, email: users.email })
+          .from(users)
+          .where(or(eq(users.role, 'ADMIN'), eq(users.role, 'MODERATOR')));
+
+        if (adminUsers.length > 0) {
+          const adminIds = adminUsers.map(admin => admin.id);
+
+          // Send webhook notification for admin systems
+          await NotificationService.queueNotification({
+            channel: 'WEBHOOK',
+            eventType: 'contribution.submitted',
+            recipient: 'system',
+            content: JSON.stringify({
+              event: 'contribution.submitted',
+              contributionId: newContribution[0].id,
+              userId: userId,
+              userEmail: contributor.email,
+              vehicleData: vehicleData,
+              timestamp: new Date().toISOString()
+            })
+          });
+
+          // Send to admin notification channels
+          const adminChannels = ['TEAMS', 'SLACK', 'DISCORD'];
+          for (const channel of adminChannels) {
+            try {
+              await NotificationService.queueNotification({
+                channel: channel as any,
+                eventType: 'contribution.submitted',
+                recipient: 'admins',
+                content: templates['contribution.submitted'][channel as keyof typeof templates['contribution.submitted']].content,
+                metadata: {
+                  vehicleData: vehicleData,
+                  contributionId: newContribution[0].id,
+                  userId: userId,
+                  userEmail: contributor.email,
+                  timestamp: new Date().toISOString()
+                }
+              });
+            } catch (channelError) {
+              console.warn(`Failed to queue ${channel} notification for admins:`, channelError);
+            }
+          }
+        }
+      }
+    } catch (notificationError) {
+      console.warn('Failed to send submission notifications:', notificationError);
+    }
+
     return c.json({ message: 'Contribution submitted successfully', contribution: newContribution[0] }, 201);
   } catch (error) {
     console.error('Error submitting contribution:', error);
@@ -213,6 +280,92 @@ contributionsRouter.get('/pending', async (c) => {
   return c.json(pendingContributions);
 });
 
+// Get all contributions with pagination (Public)
+contributionsRouter.get('/', async (c) => {
+  await ensureChangeColumns();
+
+  // Parse query parameters
+  const page = parseInt(c.req.query('page') || '1');
+  const limit = Math.min(parseInt(c.req.query('limit') || '20'), 100);
+  const status = c.req.query('status');
+  const userId = c.req.query('userId') ? parseInt(c.req.query('userId')) : undefined;
+  const sortBy = c.req.query('sortBy') || 'createdAt';
+  const sortOrder = c.req.query('sortOrder') || 'desc';
+  const offset = (page - 1) * limit;
+
+  try {
+    // Build query conditions
+    const conditions = [];
+    if (status) {
+      conditions.push(eq(contributions.status, status));
+    }
+    if (userId) {
+      conditions.push(eq(contributions.userId, userId));
+    }
+
+    // Get contributions with pagination
+    let contributionsQuery = db
+      .select({
+        id: contributions.id,
+        userId: contributions.userId,
+        userEmail: users.email,
+        changeType: contributions.changeType,
+        targetVehicleId: contributions.targetVehicleId,
+        vehicleData: contributions.vehicleData,
+        status: contributions.status,
+        createdAt: contributions.createdAt,
+        approvedAt: contributions.approvedAt,
+        rejectedAt: contributions.rejectedAt,
+        cancelledAt: contributions.cancelledAt,
+        rejectionComment: (contributions as any).rejectionComment,
+        rejectedBy: (contributions as any).rejectedBy,
+        votes: count(contributionReviews.id),
+      })
+      .from(contributions)
+      .leftJoin(contributionReviews, eq(contributions.id, contributionReviews.contributionId))
+      .leftJoin(users, eq(contributions.userId, users.id))
+      .groupBy(contributions.id, users.email);
+
+    if (conditions.length > 0) {
+      contributionsQuery = contributionsQuery.where(and(...conditions));
+    }
+
+    // Apply sorting and pagination
+    const contributionsData = await contributionsQuery
+      .orderBy(sortOrder === 'desc' ? sql`${contributions.createdAt} DESC` : sql`${contributions.createdAt} ASC`)
+      .limit(limit)
+      .offset(offset);
+
+    // Get total count for pagination
+    let totalQuery = db
+      .select({ count: count() })
+      .from(contributions);
+
+    if (conditions.length > 0) {
+      totalQuery = totalQuery.where(and(...conditions));
+    }
+
+    const [totalResult] = await totalQuery;
+    const total = totalResult.count;
+    const totalPages = Math.ceil(total / limit);
+
+    return c.json({
+      data: contributionsData,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching contributions:', error);
+    return c.json({ error: 'Failed to fetch contributions' }, 500);
+  }
+});
+
 // Get all contributions (for finding related proposals) (Public)
 contributionsRouter.get('/all', async (c) => {
   await ensureChangeColumns();
@@ -242,7 +395,7 @@ contributionsRouter.get('/all', async (c) => {
 });
 
 // Get contributions by the authenticated user
-contributionsRouter.get('/my', userAuth, async (c) => {
+contributionsRouter.get('/my', jwtAuth, async (c) => {
   await ensureChangeColumns();
   const payload = c.get('jwtPayload');
   const userId = payload.userId;
@@ -271,8 +424,52 @@ contributionsRouter.get('/my', userAuth, async (c) => {
   return c.json(userContributions);
 });
 
+// Get a single contribution by ID (Authenticated users only)
+contributionsRouter.get('/:id', hybridAuth(), async (c) => {
+  await ensureChangeColumns();
+  const contributionId = Number(c.req.param('id'));
+
+  if (isNaN(contributionId)) {
+    return c.json({ error: 'Invalid contribution ID' }, 400);
+  }
+
+  try {
+    const [contribution] = await db
+      .select({
+        id: contributions.id,
+        userId: contributions.userId,
+        userEmail: users.email,
+        changeType: contributions.changeType,
+        targetVehicleId: contributions.targetVehicleId,
+        vehicleData: contributions.vehicleData,
+        status: contributions.status,
+        createdAt: contributions.createdAt,
+        approvedAt: contributions.approvedAt,
+        rejectedAt: contributions.rejectedAt,
+        cancelledAt: contributions.cancelledAt,
+        upvotes: sql<number>`COALESCE(SUM(CASE WHEN ${contributionReviews.vote} = 1 THEN 1 ELSE 0 END), 0)`,
+        downvotes: sql<number>`COALESCE(SUM(CASE WHEN ${contributionReviews.vote} = -1 THEN 1 ELSE 0 END), 0)`,
+      })
+      .from(contributions)
+      .leftJoin(users, eq(contributions.userId, users.id))
+      .leftJoin(contributionReviews, eq(contributions.id, contributionReviews.contributionId))
+      .where(eq(contributions.id, contributionId))
+      .groupBy(contributions.id, users.email)
+      .limit(1);
+
+    if (!contribution) {
+      return c.json({ error: 'Contribution not found' }, 404);
+    }
+
+    return c.json(contribution);
+  } catch (error) {
+    console.error('Error fetching contribution:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
 // Vote on a contribution (Authenticated users only)
-contributionsRouter.post('/:id/vote', userAuth, async (c) => {
+contributionsRouter.post('/:id/vote', jwtAuth, contributionMaintenanceModeMiddleware, async (c) => {
   await ensureChangeColumns();
   const payload = c.get('jwtPayload');
   const userId = payload.userId;
@@ -313,12 +510,9 @@ contributionsRouter.post('/:id/vote', userAuth, async (c) => {
 });
 
 // Approve a contribution (Admin/Moderator only)
-contributionsRouter.post('/:id/approve', userAuth, async (c) => {
+contributionsRouter.post('/:id/approve', moderatorHybridAuth, async (c) => {
   await ensureChangeColumns();
   const payload = c.get('jwtPayload');
-  if (payload.role !== 'ADMIN' && payload.role !== 'MODERATOR') {
-    return c.json({ error: 'Unauthorized: Admin or Moderator access required' }, 403);
-  }
 
   const contributionId = Number(c.req.param('id'));
   if (isNaN(contributionId)) {
@@ -443,6 +637,61 @@ contributionsRouter.post('/:id/approve', userAuth, async (c) => {
     // Award app currency to the contributor
     await db.update(users).set({ appCurrencyBalance: sql`app_currency_balance + 10` }).where(eq(users.id, contribution.userId)); // Award 10 credits
 
+    // Send notification for contribution approval
+    try {
+      const { NotificationService } = await import('./services/notificationService');
+      const templates = NotificationService.getNotificationTemplates();
+
+      // Get contributor details
+      const [contributor] = await db.select({ email: users.email }).from(users).where(eq(users.id, contribution.userId)).limit(1);
+
+      if (contributor?.email) {
+        // Send notifications to the contributor
+        await NotificationService.queueNotificationForUsers(
+          [contribution.userId],
+          'EMAIL',
+          'contribution.approved',
+          templates['contribution.approved']['EMAIL'],
+          {
+            vehicleData: contribution.vehicleData,
+            contributionId: contributionId,
+            timestamp: new Date().toISOString(),
+            user: { email: contributor.email }
+          }
+        );
+
+        // Send webhook notifications if enabled
+        await NotificationService.queueNotification({
+          channel: 'WEBHOOK',
+          eventType: 'contribution.approved',
+          recipient: 'system',
+          content: JSON.stringify({
+            event: 'contribution.approved',
+            contributionId: contributionId,
+            userId: contribution.userId,
+            userEmail: contributor.email,
+            vehicleData: contribution.vehicleData,
+            timestamp: new Date().toISOString()
+          })
+        });
+
+        // Send notification via enabled channels based on user preferences
+        await NotificationService.sendNotificationToUser(contribution.userId, {
+          eventType: 'contribution.approved',
+          title: 'Contribution Approved',
+          content: `Your contribution "${contribution.vehicleData?.make} ${contribution.vehicleData?.model}" has been approved and is now live in the database.`,
+          metadata: {
+            vehicleData: contribution.vehicleData,
+            contributionId: contributionId,
+            userId: contribution.userId,
+            timestamp: new Date().toISOString()
+          }
+        });
+      }
+    } catch (notificationError) {
+      console.warn('Failed to send approval notifications:', notificationError);
+    }
+
     const imageApprovalMessage = associatedImages.length > 0
       ? ` and ${associatedImages.length} associated image(s) approved`
       : '';
@@ -466,12 +715,9 @@ const escapeHtml = (unsafe: string) => unsafe
   .replace(/'/g, '&#039;');
 
 // Reject a contribution (Admin/Moderator only)
-contributionsRouter.post('/:id/reject', userAuth, async (c) => {
+contributionsRouter.post('/:id/reject', moderatorHybridAuth, async (c) => {
   await ensureChangeColumns();
   const payload = c.get('jwtPayload');
-  if (payload.role !== 'ADMIN' && payload.role !== 'MODERATOR') {
-    return c.json({ error: 'Unauthorized: Admin or Moderator access required' }, 403);
-  }
 
   const contributionId = Number(c.req.param('id'));
   if (isNaN(contributionId)) {
@@ -540,15 +786,62 @@ contributionsRouter.post('/:id/reject', userAuth, async (c) => {
       })
       .where(eq(contributions.id, contributionId));
 
-    // Send notification email (dev stub)
+    // Send notification for contribution rejection
     try {
-      const [contributor] = await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.id, contribution.userId)).limit(1);
+      const { NotificationService } = await import('./services/notificationService');
+      const templates = NotificationService.getNotificationTemplates();
+
+      // Get contributor details
+      const [contributor] = await db.select({ email: users.email }).from(users).where(eq(users.id, contribution.userId)).limit(1);
+
       if (contributor?.email) {
-        const { sendContributionRejectionEmail } = await import('./services/emailService');
-        await sendContributionRejectionEmail(contributor.email, contribution.vehicleData as any, comment);
+        // Send notifications to the contributor
+        await NotificationService.queueNotificationForUsers(
+          [contribution.userId],
+          'EMAIL',
+          'contribution.rejected',
+          templates['contribution.rejected']['EMAIL'],
+          {
+            vehicleData: contribution.vehicleData,
+            contributionId: contributionId,
+            rejectionComment: comment,
+            timestamp: new Date().toISOString(),
+            user: { email: contributor.email }
+          }
+        );
+
+        // Send webhook notifications if enabled
+        await NotificationService.queueNotification({
+          channel: 'WEBHOOK',
+          eventType: 'contribution.rejected',
+          recipient: 'system',
+          content: JSON.stringify({
+            event: 'contribution.rejected',
+            contributionId: contributionId,
+            userId: contribution.userId,
+            userEmail: contributor.email,
+            vehicleData: contribution.vehicleData,
+            rejectionComment: comment,
+            timestamp: new Date().toISOString()
+          })
+        });
+
+        // Send notification via enabled channels based on user preferences
+        await NotificationService.sendNotificationToUser(contribution.userId, {
+          eventType: 'contribution.rejected',
+          title: 'Contribution Rejected',
+          content: `Your contribution "${contribution.vehicleData?.make} ${contribution.vehicleData?.model}" has been rejected. ${comment ? `Reason: ${comment}` : 'Please check the feedback and resubmit.'}`,
+          metadata: {
+            vehicleData: contribution.vehicleData,
+            contributionId: contributionId,
+            userId: contribution.userId,
+            rejectionComment: comment,
+            timestamp: new Date().toISOString()
+          }
+        });
       }
-    } catch (emailErr) {
-      console.warn('Email notification failed:', emailErr);
+    } catch (notificationError) {
+      console.warn('Failed to send rejection notifications:', notificationError);
     }
 
     // Audit log + moderation log row
@@ -582,7 +875,7 @@ contributionsRouter.post('/:id/reject', userAuth, async (c) => {
 });
 
 // Cancel a contribution (owner only) if still pending
-contributionsRouter.post('/:id/cancel', userAuth, async (c) => {
+contributionsRouter.post('/:id/cancel', jwtAuth, contributionMaintenanceModeMiddleware, async (c) => {
   const payload = c.get('jwtPayload');
   const userId = payload.userId;
   const contributionId = Number(c.req.param('id'));
@@ -640,7 +933,7 @@ contributionsRouter.post('/:id/cancel', userAuth, async (c) => {
       .where(eq(contributions.id, contributionId));
 
 // Resubmit a rejected contribution (owner only): clone into new PENDING proposal keeping vehicleData
-contributionsRouter.post('/:id/resubmit', userAuth, async (c) => {
+contributionsRouter.post('/:id/resubmit', jwtAuth, contributionMaintenanceModeMiddleware, async (c) => {
   await ensureChangeColumns();
   const payload = c.get('jwtPayload');
   const userId = payload.userId;
@@ -694,7 +987,7 @@ contributionsRouter.post('/:id/resubmit', userAuth, async (c) => {
 });
 
 // Update a contribution (owner only) if still pending
-contributionsRouter.put('/:id', userAuth, async (c) => {
+contributionsRouter.put('/:id', jwtAuth, contributionMaintenanceModeMiddleware, async (c) => {
   await ensureChangeColumns();
   const payload = c.get('jwtPayload');
   const userId = payload.userId;

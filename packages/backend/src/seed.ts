@@ -2,21 +2,11 @@ import { Hono } from 'hono';
 import { db } from './db';
 import { vehicles, contributions, users } from './db/schema';
 import { faker } from '@faker-js/faker';
-import { jwt } from 'hono/jwt';
+import { jwtAuth, adminHybridAuth } from './middleware/auth';
 
 const seedRouter = new Hono();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-
-// Middleware to protect routes
-const adminAuth = jwt({ secret: JWT_SECRET });
-const userAuth = jwt({ secret: JWT_SECRET });
-
-seedRouter.post('/vehicles', adminAuth, async (c) => {
-  const payload = c.get('jwtPayload');
-  if (payload.role !== 'ADMIN') {
-    return c.json({ error: 'Unauthorized: Admin access required' }, 403);
-  }
+seedRouter.post('/vehicles', adminHybridAuth, async (c) => {
 
   try {
     const newVehicles = [];
@@ -43,7 +33,7 @@ seedRouter.post('/vehicles', adminAuth, async (c) => {
 export default seedRouter;
 
 // Seed random contributions - available to any authenticated user in dev mode
-seedRouter.post('/contributions', userAuth, async (c) => {
+seedRouter.post('/contributions', jwtAuth, async (c) => {
   try {
     const payload = c.get('jwtPayload');
     const requesterRole = payload.role as 'MEMBER' | 'MODERATOR' | 'ADMIN';

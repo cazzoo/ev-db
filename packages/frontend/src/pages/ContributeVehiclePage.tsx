@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { Vehicle, submitContribution, submitImageContribution } from '../services/api';
 import MultiStepContributionForm from '../components/MultiStepContributionForm';
+import ContributionMaintenanceGuard from '../components/ContributionMaintenanceGuard';
 
 interface ImageWithMetadata {
   file: File;
@@ -47,8 +48,6 @@ const ContributeVehiclePage: React.FC = () => {
 
       // If images were provided, submit them as image contributions
       if (images && images.length > 0) {
-        console.log(`Submitting ${images.length} images for contribution ${contribution.id}`);
-
         // Submit each image as an image contribution
         const imageSubmissions = images.map(async (imageData) => {
           try {
@@ -117,8 +116,9 @@ const ContributeVehiclePage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-base-200">
-      <div className="container mx-auto px-4 py-6">
+    <ContributionMaintenanceGuard>
+      <div className="min-h-screen bg-base-200">
+        <div className="container mx-auto px-4 py-6">
         {/* Compact Vehicle Context Bar - always shown */}
         <div className={`w-full mb-3 px-4 py-3 rounded-lg border-l-4 ${
           locationState?.mode === 'UPDATE' ? 'bg-warning/10 border-l-warning' :
@@ -246,8 +246,9 @@ const ContributeVehiclePage: React.FC = () => {
             </div>
           </div>
         )}
+        </div>
       </div>
-    </div>
+    </ContributionMaintenanceGuard>
   );
 };
 

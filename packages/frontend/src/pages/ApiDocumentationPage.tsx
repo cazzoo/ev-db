@@ -1,5 +1,16 @@
 import { useState } from 'react';
-import { DocumentTextIcon, KeyIcon, UserIcon, TruckIcon, PencilSquareIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
+import {
+  DocumentTextIcon,
+  KeyIcon,
+  UserIcon,
+  TruckIcon,
+  PencilSquareIcon,
+  Cog6ToothIcon,
+  PhotoIcon,
+  BellIcon,
+  ChartBarIcon,
+  CodeBracketIcon
+} from '@heroicons/react/24/outline';
 
 const ApiDocumentationPage = () => {
   const [activeSection, setActiveSection] = useState('overview');
@@ -11,11 +22,15 @@ const ApiDocumentationPage = () => {
     { id: 'api-keys', title: 'API Keys', icon: KeyIcon },
     { id: 'vehicles', title: 'Vehicles', icon: TruckIcon },
     { id: 'contributions', title: 'Contributions', icon: PencilSquareIcon },
+    { id: 'images', title: 'Images', icon: PhotoIcon },
+    { id: 'notifications', title: 'Notifications', icon: BellIcon },
+    { id: 'statistics', title: 'Statistics', icon: ChartBarIcon },
     { id: 'admin', title: 'Admin', icon: Cog6ToothIcon },
+    { id: 'typescript', title: 'TypeScript Client', icon: CodeBracketIcon },
     { id: 'testing', title: 'API Testing', icon: DocumentTextIcon },
   ];
 
-  const baseUrl = 'http://localhost:3000/api';
+  const baseUrl = '/api';
 
   const CodeBlock = ({ children, title }: { children: string; title?: string }) => {
     const copyToClipboard = () => {
@@ -94,9 +109,42 @@ const ApiDocumentationPage = () => {
             <h2 className="text-2xl font-bold mb-4">API Overview</h2>
             <div className="prose max-w-none">
               <p className="text-base-content/70 mb-4">
-                The EV Database API provides access to electric vehicle data, user contributions, and administrative functions.
-                All API endpoints are prefixed with <code className="bg-base-200 px-2 py-1 rounded">/api</code>.
+                The EV Database API is a comprehensive RESTful API for managing electric vehicle data, user contributions,
+                and administrative functions. All API endpoints are prefixed with <code className="bg-base-200 px-2 py-1 rounded">/api</code>.
               </p>
+
+              <div className="alert alert-info mb-6">
+                <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <h3 className="font-bold">Updated API Client</h3>
+                  <div className="text-sm">
+                    The frontend now includes a comprehensive TypeScript API client with improved error handling,
+                    type safety, and complete documentation. See the TypeScript Client section for details.
+                  </div>
+                </div>
+              </div>
+
+              <h3 className="text-xl font-semibold mb-3">🚀 Key Features</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="card bg-base-200 p-4">
+                  <h4 className="font-semibold mb-2">🔐 Dual Authentication</h4>
+                  <p className="text-sm">Supports both JWT (frontend) and API key (external) authentication</p>
+                </div>
+                <div className="card bg-base-200 p-4">
+                  <h4 className="font-semibold mb-2">📊 Comprehensive Data</h4>
+                  <p className="text-sm">Complete vehicle specifications, user contributions, and statistics</p>
+                </div>
+                <div className="card bg-base-200 p-4">
+                  <h4 className="font-semibold mb-2">🎯 Type Safety</h4>
+                  <p className="text-sm">Full TypeScript support with detailed interfaces and error handling</p>
+                </div>
+                <div className="card bg-base-200 p-4">
+                  <h4 className="font-semibold mb-2">⚡ Rate Limiting</h4>
+                  <p className="text-sm">Role-based rate limits with transparent status reporting</p>
+                </div>
+              </div>
 
               <div className="alert alert-info mb-4">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-6 h-6">
@@ -1004,6 +1052,413 @@ X-RateLimit-Burst-Remaining: 18`}
                 </table>
               </div>
             </div>
+          </div>
+        );
+
+      case 'typescript':
+        return (
+          <div>
+            <h2 className="text-2xl font-bold mb-4">TypeScript API Client</h2>
+
+            <div className="alert alert-success mb-6">
+              <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <h3 className="font-bold">Comprehensive TypeScript Support</h3>
+                <div className="text-sm">
+                  The frontend includes a fully typed API client with improved error handling,
+                  comprehensive interfaces, and complete JSDoc documentation.
+                </div>
+              </div>
+            </div>
+
+            <h3 className="text-xl font-semibold mb-3">🎯 Key Features</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="card bg-base-200 p-4">
+                <h4 className="font-semibold mb-2">🔒 Type Safety</h4>
+                <p className="text-sm">Complete TypeScript interfaces for all API responses and requests</p>
+              </div>
+              <div className="card bg-base-200 p-4">
+                <h4 className="font-semibold mb-2">⚡ Error Handling</h4>
+                <p className="text-sm">Standardized ApiError class with detailed error information</p>
+              </div>
+              <div className="card bg-base-200 p-4">
+                <h4 className="font-semibold mb-2">📚 Documentation</h4>
+                <p className="text-sm">JSDoc comments for all functions with parameter and return types</p>
+              </div>
+              <div className="card bg-base-200 p-4">
+                <h4 className="font-semibold mb-2">🔄 Consistency</h4>
+                <p className="text-sm">Unified response handling and authentication patterns</p>
+              </div>
+            </div>
+
+            <h3 className="text-xl font-semibold mb-3">Basic Usage</h3>
+            <CodeBlock title="Import and Use">
+{`import {
+  fetchVehicles,
+  createApiKey,
+  ApiError,
+  Vehicle,
+  ApiKey
+} from '../services/api';
+
+// Fetch vehicles with type safety
+try {
+  const vehicles: Vehicle[] = await fetchVehicles();
+  console.log('Vehicles:', vehicles);
+} catch (error) {
+  if (error instanceof ApiError) {
+    console.error('API Error:', error.message, error.status);
+  }
+}`}
+            </CodeBlock>
+
+            <h3 className="text-xl font-semibold mb-3 mt-6">Available Interfaces</h3>
+            <div className="overflow-x-auto">
+              <table className="table table-zebra">
+                <thead>
+                  <tr>
+                    <th>Interface</th>
+                    <th>Description</th>
+                    <th>Usage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>Vehicle</code></td>
+                    <td>Vehicle data structure</td>
+                    <td>Vehicle CRUD operations</td>
+                  </tr>
+                  <tr>
+                    <td><code>User</code></td>
+                    <td>User account information</td>
+                    <td>User management</td>
+                  </tr>
+                  <tr>
+                    <td><code>Contribution</code></td>
+                    <td>User contribution data</td>
+                    <td>Contribution system</td>
+                  </tr>
+                  <tr>
+                    <td><code>ApiKey</code></td>
+                    <td>API key information</td>
+                    <td>API key management</td>
+                  </tr>
+                  <tr>
+                    <td><code>PaginatedResponse&lt;T&gt;</code></td>
+                    <td>Paginated API responses</td>
+                    <td>List endpoints</td>
+                  </tr>
+                  <tr>
+                    <td><code>ApiError</code></td>
+                    <td>Standardized error class</td>
+                    <td>Error handling</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3 className="text-xl font-semibold mb-3 mt-6">Error Handling</h3>
+            <CodeBlock title="Advanced Error Handling">
+{`import { ApiError, fetchVehicleById } from '../services/api';
+
+try {
+  const vehicle = await fetchVehicleById(123);
+  console.log('Vehicle:', vehicle);
+} catch (error) {
+  if (error instanceof ApiError) {
+    switch (error.status) {
+      case 401:
+        // Handle authentication error
+        console.error('Authentication required');
+        break;
+      case 403:
+        // Handle permission error
+        console.error('Insufficient permissions');
+        break;
+      case 404:
+        // Handle not found
+        console.error('Vehicle not found');
+        break;
+      case 429:
+        // Handle rate limiting
+        console.error('Rate limit exceeded');
+        break;
+      default:
+        console.error('API Error:', error.message);
+    }
+  } else {
+    console.error('Unexpected error:', error);
+  }
+}`}
+            </CodeBlock>
+
+            <h3 className="text-xl font-semibold mb-3 mt-6">Function Categories</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="card bg-base-200 p-4">
+                <h4 className="font-semibold mb-2">🔐 Authentication</h4>
+                <ul className="text-sm space-y-1">
+                  <li><code>loginUser()</code></li>
+                  <li><code>registerUser()</code></li>
+                  <li><code>getCurrentUser()</code></li>
+                  <li><code>uploadAvatar()</code></li>
+                </ul>
+              </div>
+              <div className="card bg-base-200 p-4">
+                <h4 className="font-semibold mb-2">🚗 Vehicles</h4>
+                <ul className="text-sm space-y-1">
+                  <li><code>fetchVehicles()</code></li>
+                  <li><code>fetchVehicleById()</code></li>
+                  <li><code>createVehicle()</code></li>
+                  <li><code>updateVehicle()</code></li>
+                </ul>
+              </div>
+              <div className="card bg-base-200 p-4">
+                <h4 className="font-semibold mb-2">📝 Contributions</h4>
+                <ul className="text-sm space-y-1">
+                  <li><code>submitContribution()</code></li>
+                  <li><code>fetchMyContributions()</code></li>
+                  <li><code>approveContribution()</code></li>
+                  <li><code>voteOnContribution()</code></li>
+                </ul>
+              </div>
+              <div className="card bg-base-200 p-4">
+                <h4 className="font-semibold mb-2">🔑 API Keys</h4>
+                <ul className="text-sm space-y-1">
+                  <li><code>fetchApiKeys()</code></li>
+                  <li><code>createApiKey()</code></li>
+                  <li><code>revokeApiKey()</code></li>
+                  <li><code>fetchRateLimitStatus()</code></li>
+                </ul>
+              </div>
+              <div className="card bg-base-200 p-4">
+                <h4 className="font-semibold mb-2">👥 Admin</h4>
+                <ul className="text-sm space-y-1">
+                  <li><code>fetchAdminUsers()</code></li>
+                  <li><code>updateAdminUser()</code></li>
+                  <li><code>fetchAdminStats()</code></li>
+                  <li><code>deleteAdminUser()</code></li>
+                </ul>
+              </div>
+              <div className="card bg-base-200 p-4">
+                <h4 className="font-semibold mb-2">📊 Statistics</h4>
+                <ul className="text-sm space-y-1">
+                  <li><code>fetchStats()</code></li>
+                  <li><code>fetchApiUsage()</code></li>
+                  <li><code>fetchApiUsageStats()</code></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'images':
+        return (
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Image Management</h2>
+            <p className="text-base-content/70 mb-6">
+              Manage vehicle images with upload, moderation, and carousel functionality.
+            </p>
+
+            <EndpointCard
+              method="GET"
+              path="/images/vehicle/:vehicleId"
+              description="Get all images for a specific vehicle"
+              auth="None"
+              response={`[
+  {
+    "id": 1,
+    "vehicleId": 123,
+    "filename": "tesla-model-s.jpg",
+    "url": "/uploads/images/tesla-model-s.jpg",
+    "altText": "Tesla Model S front view",
+    "caption": "2023 Tesla Model S",
+    "displayOrder": 1,
+    "isApproved": true,
+    "uploadedAt": "2023-12-01T10:00:00Z"
+  }
+]`}
+            />
+
+            <EndpointCard
+              method="POST"
+              path="/images/contribute"
+              description="Submit an image contribution"
+              auth="JWT"
+              body={`FormData:
+- image: File (required)
+- vehicleId: number (required)
+- altText: string (optional)
+- caption: string (optional)`}
+              response={`{
+  "message": "Image contribution submitted successfully",
+  "contributionId": 456
+}`}
+            />
+
+            <EndpointCard
+              method="POST"
+              path="/images/contributions/:id/approve"
+              description="Approve an image contribution (admin only)"
+              auth="JWT (Admin)"
+              body={`{
+  "displayOrder": 2
+}`}
+              response={`{
+  "message": "Image approved successfully",
+  "image": {
+    "id": 789,
+    "vehicleId": 123,
+    "filename": "approved-image.jpg",
+    "displayOrder": 2,
+    "isApproved": true
+  }
+}`}
+            />
+
+            <EndpointCard
+              method="POST"
+              path="/images/contributions/:id/reject"
+              description="Reject an image contribution (admin only)"
+              auth="JWT (Admin)"
+              body={`{
+  "reason": "Image quality too low"
+}`}
+              response={`{
+  "message": "Image contribution rejected"
+}`}
+            />
+          </div>
+        );
+
+      case 'notifications':
+        return (
+          <div>
+            <h2 className="text-2xl font-bold mb-4">In-App Notifications</h2>
+            <p className="text-base-content/70 mb-6">
+              Manage user notifications for contributions, approvals, and system events.
+            </p>
+
+            <EndpointCard
+              method="GET"
+              path="/user/notifications"
+              description="Get user's notifications with pagination"
+              auth="JWT"
+              response={`{
+  "notifications": [
+    {
+      "id": 1,
+      "title": "Contribution Approved",
+      "content": "Your Tesla Model S contribution has been approved",
+      "eventType": "contribution.approved",
+      "isRead": false,
+      "actionUrl": "/contributions/123",
+      "createdAt": "2023-12-01T10:00:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 5,
+    "totalPages": 1,
+    "hasNext": false,
+    "hasPrev": false
+  }
+}`}
+            />
+
+            <EndpointCard
+              method="PUT"
+              path="/user/notifications/:id/read"
+              description="Mark a notification as read"
+              auth="JWT"
+              response={`{
+  "message": "Notification marked as read",
+  "notification": {
+    "id": 1,
+    "isRead": true,
+    "readAt": "2023-12-01T10:30:00Z"
+  }
+}`}
+            />
+
+            <EndpointCard
+              method="PUT"
+              path="/user/notifications/mark-all-read"
+              description="Mark all notifications as read"
+              auth="JWT"
+              response={`{
+  "message": "All notifications marked as read",
+  "updatedCount": 5
+}`}
+            />
+          </div>
+        );
+
+      case 'statistics':
+        return (
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Statistics & Analytics</h2>
+            <p className="text-base-content/70 mb-6">
+              Access comprehensive statistics about the database and API usage.
+            </p>
+
+            <EndpointCard
+              method="GET"
+              path="/stats"
+              description="Get general database statistics"
+              auth="API Key"
+              response={`{
+  "usersCount": 1250,
+  "vehiclesCount": 450,
+  "contributionsTotal": 2100,
+  "contributionsPending": 25,
+  "contributionsApproved": 1980,
+  "contributionsRejected": 95,
+  "contributorsCount": 320
+}`}
+            />
+
+            <EndpointCard
+              method="GET"
+              path="/apikeys/usage/daily"
+              description="Get daily API usage statistics"
+              auth="JWT or API Key"
+              response={`[
+  {
+    "day": "2023-12-01",
+    "count": 150
+  },
+  {
+    "day": "2023-12-02",
+    "count": 200
+  }
+]`}
+            />
+
+            <EndpointCard
+              method="GET"
+              path="/admin/stats"
+              description="Get comprehensive admin statistics (admin only)"
+              auth="JWT (Admin)"
+              response={`{
+  "totalUsers": 1250,
+  "roleStats": {
+    "MEMBER": 1200,
+    "MODERATOR": 45,
+    "ADMIN": 5
+  },
+  "topBalances": [
+    {
+      "id": 1,
+      "email": "user@example.com",
+      "appCurrencyBalance": 5000
+    }
+  ],
+  "totalCurrency": 125000
+}`}
+            />
           </div>
         );
 
