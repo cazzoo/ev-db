@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { db } from './db';
 import { vehicles } from './db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, like, or, count, asc, desc } from 'drizzle-orm';
 import { jwt } from 'hono/jwt';
 import { apiKeyAuth } from './middleware/apiKeyAuth';
 import { adminAuth } from './middleware/adminAuth';
@@ -29,21 +29,91 @@ vehiclesRouter.get('/suggestions/models/:make', async (c) => {
   return c.json({ models });
 });
 
-// Get all vehicles with images - now secured with API key
+// Get all vehicles with images and pagination - now secured with API key
 vehiclesRouter.get('/', async (c) => {
-  const allVehicles = await db.select().from(vehicles);
+  try {
+    // Parse query parameters
+    const page = parseInt(c.req.query('page') || '1');
+    const limit = Math.min(parseInt(c.req.query('limit') || '20'), 100); // Max 100 per page
+    const search = c.req.query('search') || '';
+    const make = c.req.query('make') || '';
+    const year = c.req.query('year') ? parseInt(c.req.query('year')) : undefined;
+    const sortBy = c.req.query('sortBy') || 'id';
+    const sortOrder = c.req.query('sortOrder') || 'asc';
 
-  // Get images for all vehicles efficiently
-  const vehicleIds = allVehicles.map(v => v.id);
-  const imagesByVehicle = await getImagesForVehicles(vehicleIds);
+    const offset = (page - 1) * limit;
 
-  // Combine vehicles with their images
-  const vehiclesWithImages = allVehicles.map(vehicle => ({
-    ...vehicle,
-    images: imagesByVehicle[vehicle.id] || []
-  }));
+    // Build where conditions for filtering
+    const whereConditions = [];
 
-  return c.json(vehiclesWithImages);
+    if (search) {
+      whereConditions.push(
+        or(
+          like(vehicles.make, `%${search}%`),
+          like(vehicles.model, `%${search}%`)
+        )
+      );
+    }
+
+    if (make) {
+      whereConditions.push(eq(vehicles.make, make));
+    }
+
+    if (year) {
+      whereConditions.push(eq(vehicles.year, year));
+    }
+
+    // Get total count for pagination
+    let totalQuery = db.select({ count: count() }).from(vehicles);
+    if (whereConditions.length > 0) {
+      totalQuery = totalQuery.where(whereConditions.length === 1 ? whereConditions[0] : or(...whereConditions));
+    }
+    const [{ count: total }] = await totalQuery;
+
+    // Build main query with pagination
+    let query = db.select().from(vehicles);
+
+    if (whereConditions.length > 0) {
+      query = query.where(whereConditions.length === 1 ? whereConditions[0] : or(...whereConditions));
+    }
+
+    // Apply sorting
+    const sortColumn = vehicles[sortBy as keyof typeof vehicles] || vehicles.id;
+    query = query.orderBy(sortOrder === 'desc' ? desc(sortColumn) : asc(sortColumn));
+
+    // Apply pagination
+    const paginatedVehicles = await query.limit(limit).offset(offset);
+
+    // Get images for paginated vehicles efficiently
+    const vehicleIds = paginatedVehicles.map(v => v.id);
+    const imagesByVehicle = await getImagesForVehicles(vehicleIds);
+
+    // Combine vehicles with their images
+    const vehiclesWithImages = paginatedVehicles.map(vehicle => ({
+      ...vehicle,
+      images: imagesByVehicle[vehicle.id] || []
+    }));
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(total / limit);
+    const hasNext = page < totalPages;
+    const hasPrev = page > 1;
+
+    return c.json({
+      data: vehiclesWithImages,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext,
+        hasPrev
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching vehicles:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
 });
 
 // Get a single vehicle by ID with images - now secured with API key

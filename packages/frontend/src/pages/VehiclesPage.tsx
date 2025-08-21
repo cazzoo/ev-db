@@ -2,6 +2,7 @@ import { useEffect, useState, useContext } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   fetchVehicles,
+  fetchVehiclesPaginated,
   createVehicle,
   updateVehicle,
   deleteVehicle,
@@ -11,7 +12,9 @@ import {
   submitContribution,
   fetchPendingContributions,
   Contribution,
-  DuplicateError
+  DuplicateError,
+  PaginatedResponse,
+  Pagination
 } from '../services/api';
 import ContributionForm from '../components/ContributionForm';
 import MultiStepContributionForm from '../components/MultiStepContributionForm';
@@ -37,22 +40,131 @@ const VehiclesPage = () => {
     return (localStorage.getItem('vehicleViewMode') as 'table' | 'cards') || 'table';
   });
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Pagination state
+  const [pagination, setPagination] = useState<Pagination>({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+    hasNext: false,
+    hasPrev: false
+  });
+
   const { userRole, token } = useContext(AuthContext);
 
-  const loadData = async () => {
+  // Get pagination parameters from URL
+  const getUrlParams = () => {
+    const params = new URLSearchParams(location.search);
+    return {
+      page: parseInt(params.get('page') || '1'),
+      search: params.get('search') || '',
+      make: params.get('make') || '',
+      sortBy: params.get('sortBy') || '',
+      sortOrder: (params.get('sortOrder') as 'asc' | 'desc') || 'asc'
+    };
+  };
+
+  const loadData = async (params?: {
+    page?: number;
+    search?: string;
+    make?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }) => {
     try {
       setLoading(true);
-      const [vehiclesData, contributionsData] = await Promise.all([
-        fetchVehicles(),
+
+      // Use provided params or get from URL
+      const urlParams = getUrlParams();
+      const finalParams = {
+        page: params?.page || urlParams.page,
+        limit: pagination.limit,
+        search: params?.search !== undefined ? params.search : urlParams.search,
+        make: params?.make !== undefined ? params.make : urlParams.make,
+        sortBy: params?.sortBy !== undefined ? params.sortBy : urlParams.sortBy,
+        sortOrder: params?.sortOrder !== undefined ? params.sortOrder : urlParams.sortOrder,
+      };
+
+      const [vehiclesResponse, contributionsData] = await Promise.all([
+        fetchVehiclesPaginated(finalParams),
         fetchPendingContributions()
       ]);
-      setVehicles(vehiclesData);
+
+      setVehicles(vehiclesResponse.data);
+      setPagination(vehiclesResponse.pagination);
       setPendingContributions(contributionsData);
+
+      // Update search query state if it came from URL
+      if (finalParams.search !== searchQuery) {
+        setSearchQuery(finalParams.search);
+      }
     } catch (err) {
       setError((err as Error).message || 'Failed to fetch data.');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Update URL with current parameters
+  const updateUrl = (params: {
+    page?: number;
+    search?: string;
+    make?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }) => {
+    const searchParams = new URLSearchParams(location.search);
+
+    if (params.page && params.page > 1) {
+      searchParams.set('page', params.page.toString());
+    } else {
+      searchParams.delete('page');
+    }
+
+    if (params.search) {
+      searchParams.set('search', params.search);
+    } else {
+      searchParams.delete('search');
+    }
+
+    if (params.make) {
+      searchParams.set('make', params.make);
+    } else {
+      searchParams.delete('make');
+    }
+
+    if (params.sortBy) {
+      searchParams.set('sortBy', params.sortBy);
+    } else {
+      searchParams.delete('sortBy');
+    }
+
+    if (params.sortOrder && params.sortOrder !== 'asc') {
+      searchParams.set('sortOrder', params.sortOrder);
+    } else {
+      searchParams.delete('sortOrder');
+    }
+
+    const newUrl = `${location.pathname}${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+    navigate(newUrl, { replace: true });
+  };
+
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    const urlParams = getUrlParams();
+    const params = { ...urlParams, page: newPage };
+    updateUrl(params);
+    loadData(params);
+  };
+
+  // Handle search
+  const handleSearch = (search: string) => {
+    const urlParams = getUrlParams();
+    const params = { ...urlParams, search, page: 1 }; // Reset to page 1 on search
+    updateUrl(params);
+    loadData(params);
+    setSearchQuery(search);
   };
 
   useEffect(() => {
@@ -343,6 +455,11 @@ const VehiclesPage = () => {
               className="input input-bordered w-full"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSearch(searchQuery);
+                }
+              }}
               aria-describedby="search-help"
             />
             <div id="search-help" className="sr-only">
@@ -379,21 +496,108 @@ const VehiclesPage = () => {
       </div>
       {/* Conditional rendering based on view mode */}
       {viewMode === 'table' ? (
-        <DataTable<Vehicle>
-          data={vehicles}
-          columns={columns}
-          searchable={true}
-          searchPlaceholder="Filter by make or model..."
-          searchFields={['make', 'model']}
-          sortable={true}
-          paginated={true}
-          pageSize={10}
-          paginationStyle="full"
-          loading={loading}
-          error={error}
-          emptyMessage="No vehicles found."
-          zebra={true}
-        />
+        <div>
+          {/* Search input for table view */}
+          <div className="form-control w-full max-w-xs mb-4">
+            <label htmlFor="table-vehicle-search" className="sr-only">
+              Search vehicles
+            </label>
+            <input
+              id="table-vehicle-search"
+              type="text"
+              placeholder="Search vehicles..."
+              className="input input-bordered w-full"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSearch(searchQuery);
+                }
+              }}
+              aria-describedby="table-search-help"
+            />
+            <div id="table-search-help" className="sr-only">
+              Search by vehicle make or model
+            </div>
+          </div>
+
+          <DataTable<Vehicle>
+            data={vehicles}
+            columns={columns}
+            searchable={false} // Disable client-side search - we use server-side
+            sortable={true}
+            paginated={false} // Disable client-side pagination
+            loading={loading}
+            error={error}
+            emptyMessage="No vehicles found."
+            zebra={true}
+          />
+
+          {/* Server-side pagination controls */}
+          {pagination.totalPages > 1 && (
+            <div className="flex justify-center mt-6">
+              <div className="btn-group">
+                <button
+                  className="btn btn-outline"
+                  onClick={() => handlePageChange(1)}
+                  disabled={pagination.page === 1}
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                  </svg>
+                </button>
+                <button
+                  className="btn btn-outline"
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={!pagination.hasPrev}
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+
+                {/* Page numbers */}
+                {[...Array(Math.min(5, pagination.totalPages)).keys()].map(i => {
+                  const pageNum = Math.max(1, Math.min(pagination.totalPages - 4, pagination.page - 2)) + i;
+                  if (pageNum > pagination.totalPages) return null;
+                  return (
+                    <button
+                      key={pageNum}
+                      className={`btn ${pageNum === pagination.page ? 'btn-active' : 'btn-outline'}`}
+                      onClick={() => handlePageChange(pageNum)}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+
+                <button
+                  className="btn btn-outline"
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={!pagination.hasNext}
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+                <button
+                  className="btn btn-outline"
+                  onClick={() => handlePageChange(pagination.totalPages)}
+                  disabled={pagination.page === pagination.totalPages}
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Pagination info */}
+          <div className="text-center text-sm text-base-content/70 mt-4">
+            Showing {vehicles.length > 0 ? ((pagination.page - 1) * pagination.limit + 1) : 0} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} vehicles
+          </div>
+        </div>
       ) : (
         <VehicleCardGrid
           vehicles={vehicles}
@@ -409,6 +613,8 @@ const VehiclesPage = () => {
           isAuthenticated={!!token}
           searchQuery={searchQuery}
           searchFields={['make', 'model']}
+          pagination={pagination}
+          onPageChange={handlePageChange}
         />
       )}
 

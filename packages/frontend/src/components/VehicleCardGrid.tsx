@@ -1,5 +1,5 @@
 import React from 'react';
-import { Vehicle, Contribution } from '../services/api';
+import { Vehicle, Contribution, Pagination } from '../services/api';
 import { Grid } from '../design-system/components/Layout';
 import VehicleCard from './VehicleCard';
 
@@ -17,6 +17,9 @@ interface VehicleCardGridProps {
   isAuthenticated?: boolean;
   searchQuery?: string;
   searchFields?: (keyof Vehicle)[];
+  // Pagination props
+  pagination?: Pagination;
+  onPageChange?: (page: number) => void;
 }
 
 // Loading skeleton card component
@@ -74,28 +77,12 @@ const VehicleCardGrid: React.FC<VehicleCardGridProps> = ({
   pendingContributions = [],
   isAuthenticated = false,
   searchQuery = '',
-  searchFields = ['make', 'model']
+  searchFields = ['make', 'model'],
+  pagination,
+  onPageChange
 }) => {
-  // Filter vehicles based on search query
-  const filteredVehicles = React.useMemo(() => {
-    if (!searchQuery.trim()) {
-      return vehicles;
-    }
-
-    const query = searchQuery.toLowerCase().trim();
-    return vehicles.filter(vehicle => {
-      return searchFields.some(field => {
-        const value = vehicle[field];
-        if (typeof value === 'string') {
-          return value.toLowerCase().includes(query);
-        }
-        if (typeof value === 'number') {
-          return value.toString().includes(query);
-        }
-        return false;
-      });
-    });
-  }, [vehicles, searchQuery, searchFields]);
+  // No client-side filtering since we're using server-side pagination
+  const filteredVehicles = vehicles;
 
   // Show loading state
   if (loading) {
@@ -206,6 +193,73 @@ const VehicleCardGrid: React.FC<VehicleCardGridProps> = ({
           />
         ))}
       </Grid>
+
+      {/* Pagination controls */}
+      {pagination && pagination.totalPages > 1 && onPageChange && (
+        <div className="flex justify-center mt-6">
+          <div className="btn-group">
+            <button
+              className="btn btn-outline"
+              onClick={() => onPageChange(1)}
+              disabled={pagination.page === 1}
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+              </svg>
+            </button>
+            <button
+              className="btn btn-outline"
+              onClick={() => onPageChange(pagination.page - 1)}
+              disabled={!pagination.hasPrev}
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+
+            {/* Page numbers */}
+            {[...Array(Math.min(5, pagination.totalPages)).keys()].map(i => {
+              const pageNum = Math.max(1, Math.min(pagination.totalPages - 4, pagination.page - 2)) + i;
+              if (pageNum > pagination.totalPages) return null;
+              return (
+                <button
+                  key={pageNum}
+                  className={`btn ${pageNum === pagination.page ? 'btn-active' : 'btn-outline'}`}
+                  onClick={() => onPageChange(pageNum)}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+
+            <button
+              className="btn btn-outline"
+              onClick={() => onPageChange(pagination.page + 1)}
+              disabled={!pagination.hasNext}
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+            <button
+              className="btn btn-outline"
+              onClick={() => onPageChange(pagination.totalPages)}
+              disabled={pagination.page === pagination.totalPages}
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Pagination info */}
+      {pagination && (
+        <div className="text-center text-sm text-base-content/70 mt-4">
+          Showing {filteredVehicles.length > 0 ? ((pagination.page - 1) * pagination.limit + 1) : 0} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} vehicles
+        </div>
+      )}
     </div>
   );
 };
