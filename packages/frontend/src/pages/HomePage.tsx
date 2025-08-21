@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { fetchUsers, fetchStats, Stats } from '../services/api';
+import { fetchUsers, fetchStats, Stats, fetchRecentVehicles, fetchRecentContributions, Vehicle, Contribution } from '../services/api';
 import EnhancedStats, { StatIcons } from '../components/EnhancedStats';
+import SpotlightSection from '../components/SpotlightSection';
 
 interface User {
   id: number;
@@ -13,9 +14,18 @@ interface User {
 
 const HomePage = () => {
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Spotlight data
+  const [recentVehicles, setRecentVehicles] = useState<Vehicle[]>([]);
+  const [recentContributions, setRecentContributions] = useState<Contribution[]>([]);
+  const [vehiclesLoading, setVehiclesLoading] = useState(true);
+  const [contributionsLoading, setContributionsLoading] = useState(true);
+  const [vehiclesError, setVehiclesError] = useState<string | null>(null);
+  const [contributionsError, setContributionsError] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [statsError, setStatsError] = useState<string | null>(null);
 
@@ -40,9 +50,47 @@ const HomePage = () => {
       }
     };
 
+    const loadRecentVehicles = async () => {
+      try {
+        setVehiclesLoading(true);
+        const data = await fetchRecentVehicles(5);
+        setRecentVehicles(data.vehicles);
+      } catch (err) {
+        setVehiclesError(err instanceof Error ? err.message : 'Failed to load recent vehicles');
+      } finally {
+        setVehiclesLoading(false);
+      }
+    };
+
+    const loadRecentContributions = async () => {
+      try {
+        setContributionsLoading(true);
+        const data = await fetchRecentContributions(5);
+        setRecentContributions(data.contributions);
+      } catch (err) {
+        setContributionsError(err instanceof Error ? err.message : 'Failed to load recent contributions');
+      } finally {
+        setContributionsLoading(false);
+      }
+    };
+
     getUsers();
     getStats();
+    loadRecentVehicles();
+    loadRecentContributions();
   }, []);
+
+  // Handle contribution click - navigate to contributions page with specific contribution
+  const handleContributionClick = (contribution: Contribution) => {
+    navigate('/contributions/browse', {
+      state: { openContributionId: contribution.id }
+    });
+  };
+
+  // Handle vehicle click - navigate to vehicles page
+  const handleVehicleClick = (vehicle: Vehicle) => {
+    navigate('/vehicles');
+  };
 
   return (
     <div>
@@ -137,6 +185,29 @@ const HomePage = () => {
           </div>
         )}
       </section>
+
+      {/* Spotlight Sections */}
+      <SpotlightSection
+        title="Recently Added Vehicles"
+        items={recentVehicles}
+        type="vehicles"
+        loading={vehiclesLoading}
+        error={vehiclesError}
+        viewAllLink="/vehicles"
+        className="mb-8"
+        onVehicleClick={handleVehicleClick}
+      />
+
+      <SpotlightSection
+        title="Recent Contributions"
+        items={recentContributions}
+        type="contributions"
+        loading={contributionsLoading}
+        error={contributionsError}
+        viewAllLink="/contributions/browse"
+        className="mb-8"
+        onContributionClick={handleContributionClick}
+      />
 
       {/* CTA Section */}
       <section className="mb-8">

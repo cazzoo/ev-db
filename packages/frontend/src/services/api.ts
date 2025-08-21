@@ -161,6 +161,8 @@ export interface Vehicle {
   price?: number;
   description?: string;
   images?: VehicleImage[];
+  createdAt?: string;
+  isNew?: boolean;
 }
 
 /**
@@ -423,6 +425,20 @@ export const deleteVehicle = async (id: number): Promise<void> => {
   await handleApiResponse<{message: string}>(response);
 };
 
+/**
+ * Fetch recent vehicles for spotlight sections
+ * @param limit Maximum number of vehicles to fetch (default: 5, max: 10)
+ * @returns Promise<{vehicles: Vehicle[], total: number}> Recent vehicles with isNew flag
+ */
+export const fetchRecentVehicles = async (limit: number = 5): Promise<{vehicles: Vehicle[], total: number}> => {
+  const response = await fetch(`${API_URL}/vehicles/recent?limit=${Math.min(limit, 10)}`, {
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
+  return handleApiResponse<{vehicles: Vehicle[], total: number}>(response);
+};
+
 // ============================================================================
 // STATISTICS
 // ============================================================================
@@ -475,6 +491,7 @@ export interface Contribution {
   rejectionComment?: string;
   cancelledAt?: string;
   votes?: number;
+  isNew?: boolean;
 }
 
 /**
@@ -710,6 +727,20 @@ export const cancelMyContribution = async (id: number): Promise<void> => {
     },
   });
   await handleApiResponse<{message: string}>(response);
+};
+
+/**
+ * Fetch recent contributions for spotlight sections
+ * @param limit Maximum number of contributions to fetch (default: 5, max: 10)
+ * @returns Promise<{contributions: Contribution[], total: number}> Recent contributions with isNew flag
+ */
+export const fetchRecentContributions = async (limit: number = 5): Promise<{contributions: Contribution[], total: number}> => {
+  const response = await fetch(`${API_URL}/contributions/recent?limit=${Math.min(limit, 10)}`, {
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
+  return handleApiResponse<{contributions: Contribution[], total: number}>(response);
 };
 
 /**

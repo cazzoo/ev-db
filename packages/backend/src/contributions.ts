@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { db, sqlClient } from './db';
 import { contributions, users, contributionReviews, vehicles, imageContributions, vehicleImages, moderationLogs } from './db/schema';
-import { eq, and, count, sql, or } from 'drizzle-orm';
+import { eq, and, count, sql, or, desc } from 'drizzle-orm';
 import { jwtAuth, moderatorHybridAuth, hybridAuth } from './middleware/auth';
 import { checkForDuplicate, deductContributionCredit, VehicleData } from './services/vehicleDuplicateService';
 import { contributionMaintenanceModeMiddleware } from './middleware/maintenanceMode';
@@ -14,6 +14,50 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 const contributionsRouter = new Hono();
 
 
+
+// Get recent contributions for spotlight sections (Public)
+contributionsRouter.get('/recent', async (c) => {
+  await ensureChangeColumns();
+
+  try {
+    const limit = Math.min(parseInt(c.req.query('limit') || '5'), 10); // Max 10 for spotlight
+
+    // Get recent contributions ordered by creation date
+    const recentContributions = await db
+      .select({
+        id: contributions.id,
+        userId: contributions.userId,
+        userEmail: users.email,
+        changeType: contributions.changeType,
+        targetVehicleId: contributions.targetVehicleId,
+        vehicleData: contributions.vehicleData,
+        status: contributions.status,
+        createdAt: contributions.createdAt,
+        approvedAt: contributions.approvedAt,
+        rejectedAt: contributions.rejectedAt,
+        cancelledAt: contributions.cancelledAt,
+      })
+      .from(contributions)
+      .leftJoin(users, eq(contributions.userId, users.id))
+      .orderBy(desc(contributions.createdAt))
+      .limit(limit);
+
+    // Add "isNew" flag for contributions created within the last 7 days
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const contributionsWithNewFlag = recentContributions.map(contribution => ({
+      ...contribution,
+      isNew: contribution.createdAt && new Date(contribution.createdAt) > sevenDaysAgo
+    }));
+
+    return c.json({
+      contributions: contributionsWithNewFlag,
+      total: contributionsWithNewFlag.length
+    });
+  } catch (error) {
+    console.error('Error fetching recent contributions:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
 
 // Real-time duplicate check endpoint (for UI feedback)
 contributionsRouter.post('/check-duplicate', jwtAuth, contributionMaintenanceModeMiddleware, async (c) => {

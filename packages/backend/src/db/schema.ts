@@ -19,7 +19,11 @@ export const vehicles = sqliteTable('vehicles', {
   range: integer('range'), // in km
   chargingSpeed: integer('charging_speed'), // in kW
   description: text('description'),
-});
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  createdAtIdx: index('vehicles_created_at_idx').on(table.createdAt),
+  makeModelIdx: index('vehicles_make_model_idx').on(table.make, table.model),
+}));
 
 export const vehicleImages = sqliteTable('vehicle_images', {
   id: integer('id').primaryKey(),

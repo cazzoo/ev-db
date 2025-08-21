@@ -29,6 +29,39 @@ vehiclesRouter.get('/suggestions/models/:make', async (c) => {
   return c.json({ models });
 });
 
+// Get recent vehicles for spotlight sections
+vehiclesRouter.get('/recent', async (c) => {
+  try {
+    const limit = Math.min(parseInt(c.req.query('limit') || '5'), 10); // Max 10 for spotlight
+
+    // Get recent vehicles ordered by creation date
+    const recentVehicles = await db.select()
+      .from(vehicles)
+      .orderBy(desc(vehicles.createdAt))
+      .limit(limit);
+
+    // Get images for these vehicles
+    const vehicleIds = recentVehicles.map(v => v.id);
+    const imagesByVehicle = await getImagesForVehicles(vehicleIds);
+
+    // Combine vehicles with their images and add "isNew" flag
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const vehiclesWithImages = recentVehicles.map(vehicle => ({
+      ...vehicle,
+      images: imagesByVehicle[vehicle.id] || [],
+      isNew: vehicle.createdAt && new Date(vehicle.createdAt) > sevenDaysAgo
+    }));
+
+    return c.json({
+      vehicles: vehiclesWithImages,
+      total: vehiclesWithImages.length
+    });
+  } catch (error) {
+    console.error('Error fetching recent vehicles:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
 // Get all vehicles with images and pagination - now secured with API key
 vehiclesRouter.get('/', async (c) => {
   try {
@@ -38,8 +71,8 @@ vehiclesRouter.get('/', async (c) => {
     const search = c.req.query('search') || '';
     const make = c.req.query('make') || '';
     const year = c.req.query('year') ? parseInt(c.req.query('year')) : undefined;
-    const sortBy = c.req.query('sortBy') || 'id';
-    const sortOrder = c.req.query('sortOrder') || 'asc';
+    const sortBy = c.req.query('sortBy') || 'createdAt';
+    const sortOrder = c.req.query('sortOrder') || 'desc';
 
     const offset = (page - 1) * limit;
 
@@ -159,6 +192,7 @@ vehiclesRouter.post('/', ...adminAuth, async (c) => {
       batteryCapacity,
       range,
       chargingSpeed,
+      createdAt: new Date(),
     }).returning();
 
     return c.json({ message: 'Vehicle created successfully', vehicle: newVehicle[0] }, 201);

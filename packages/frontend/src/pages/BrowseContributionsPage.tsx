@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import DataTable, { Column } from '../components/DataTable';
 import VehicleImageCarousel from '../components/VehicleImageCarousel';
+import SpotlightSection from '../components/SpotlightSection';
 import { checkMaintenanceMode } from '../services/api';
 
 import {
@@ -14,6 +15,7 @@ import {
   cancelMyContribution,
   updateMyContribution,
   fetchPendingImageContributions,
+  fetchRecentContributions,
   Contribution,
   Vehicle,
   ImageContribution,
@@ -444,11 +446,16 @@ const [rejectError, setRejectError] = useState<string | null>(null);
   // Ref to track processed auto-opens to prevent reopening after approval
   const processedAutoOpenRef = useRef<number | null>(null);
 
+  // Spotlight state
+  const [recentContributions, setRecentContributions] = useState<Contribution[]>([]);
+  const [spotlightLoading, setSpotlightLoading] = useState(true);
+  const [spotlightError, setSpotlightError] = useState<string | null>(null);
+
   // Helper function to get related proposals for a vehicle
   // Only returns PENDING proposals to prevent navigation through cancelled/rejected proposals
   const getRelatedProposals = (targetContribution: Contribution, allContributions: Contribution[], vehicles?: Vehicle[]): Contribution[] => {
     const related: Contribution[] = [];
-    const vehiclesToSearch = vehicles || allVehicles;
+    const vehiclesToSearch = Array.isArray(vehicles) ? vehicles : Array.isArray(allVehicles) ? allVehicles : [];
 
     if (targetContribution.changeType === 'UPDATE' && targetContribution.targetVehicleId) {
       // For UPDATE proposals, find all PENDING proposals targeting the same vehicle
@@ -644,6 +651,23 @@ const [rejectError, setRejectError] = useState<string | null>(null);
     loadData();
   }, [loadData]);
 
+  // Load spotlight data
+  useEffect(() => {
+    const loadSpotlightData = async () => {
+      try {
+        setSpotlightLoading(true);
+        const data = await fetchRecentContributions(5);
+        setRecentContributions(data.contributions);
+      } catch (err) {
+        setSpotlightError(err instanceof Error ? err.message : 'Failed to load recent contributions');
+      } finally {
+        setSpotlightLoading(false);
+      }
+    };
+
+    loadSpotlightData();
+  }, []);
+
   const handleModalAction = useCallback(async (action: (id: number) => Promise<void>, id: number) => {
     setIsSubmitting(true);
     setModalError(null);
@@ -685,7 +709,7 @@ const [rejectError, setRejectError] = useState<string | null>(null);
 
   // Helper function to find the best reference vehicle for comparison
   const findReferenceVehicle = (proposal: Contribution, vehicles?: Vehicle[]): Vehicle | null => {
-    const vehiclesToSearch = vehicles || allVehicles;
+    const vehiclesToSearch = Array.isArray(vehicles) ? vehicles : Array.isArray(allVehicles) ? allVehicles : [];
 
     if (proposal.changeType === 'UPDATE' && proposal.targetVehicleId) {
       return vehiclesToSearch.find(v => v.id === proposal.targetVehicleId) || null;
@@ -927,7 +951,7 @@ const [rejectError, setRejectError] = useState<string | null>(null);
       key: 'vehicle',
       header: 'Vehicle',
       render: (_, contribution) => {
-        const originalVehicleInfo = contribution.changeType === 'UPDATE'
+        const originalVehicleInfo = contribution.changeType === 'UPDATE' && Array.isArray(allVehicles)
           ? allVehicles.find(v => v.id === contribution.targetVehicleId)
           : null;
         const displayVehicle = originalVehicleInfo || contribution.vehicleData;
@@ -973,29 +997,31 @@ const [rejectError, setRejectError] = useState<string | null>(null);
       show: () => isAuthenticated,
       render: (_, contribution) => (
         <div className="flex gap-2">
-          {user?.userId !== contribution.userId && (
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleModalAction(voteOnContribution, contribution.id);
-              }}
-            >
-              Vote (+1)
-            </button>
-          )}
-          {user?.userId === contribution.userId && contribution.status === 'PENDING' && (
-            <button
-              className="btn btn-outline btn-error btn-sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleModalAction(cancelMyContribution, contribution.id);
-              }}
-            >
-              Cancel
-            </button>
-          )}
-          {(user?.role === 'ADMIN' || (user?.role === 'MODERATOR' && user?.userId !== contribution.userId)) && (
+          {contribution.status === 'PENDING' ? (
+            <>
+              {user?.userId !== contribution.userId && (
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleModalAction(voteOnContribution, contribution.id);
+                  }}
+                >
+                  Vote (+1)
+                </button>
+              )}
+              {user?.userId === contribution.userId && (
+                <button
+                  className="btn btn-outline btn-error btn-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleModalAction(cancelMyContribution, contribution.id);
+                  }}
+                >
+                  Cancel
+                </button>
+              )}
+              {(user?.role === 'ADMIN' || (user?.role === 'MODERATOR' && user?.userId !== contribution.userId)) && (
             <>
               <button
                 className="btn btn-success btn-sm"
@@ -1065,7 +1091,17 @@ const [rejectError, setRejectError] = useState<string | null>(null);
                   </div>
                 </div>
               )}
+                </>
+              )}
             </>
+          ) : (
+            <div className={`badge ${
+              contribution.status === 'APPROVED' ? 'badge-success' :
+              contribution.status === 'REJECTED' ? 'badge-error' :
+              'badge-neutral'
+            } badge-sm`}>
+              {contribution.status}
+            </div>
           )}
         </div>
       ),
@@ -1081,6 +1117,23 @@ const [rejectError, setRejectError] = useState<string | null>(null);
           <span>Please log in to vote or moderate contributions.</span>
         </div>
       )}
+
+      {/* Recent Contributions Spotlight */}
+      <SpotlightSection
+        title="Recent Contributions"
+        items={recentContributions}
+        type="contributions"
+        loading={spotlightLoading}
+        error={spotlightError}
+        className="mb-8"
+        onContributionClick={(contribution) => {
+          // Ensure allVehicles is an array (even if empty)
+          const vehiclesArray = Array.isArray(allVehicles) ? allVehicles : [];
+          handleShowDiff(contribution, vehiclesArray);
+        }}
+      />
+
+      <h3 className="text-2xl font-semibold mb-4">Pending Contributions</h3>
 
       <DataTable<Contribution>
         data={pendingContributions}
@@ -1290,7 +1343,7 @@ const [rejectError, setRejectError] = useState<string | null>(null);
             <div className="flex justify-between items-center w-full">
               {/* Action buttons - left side */}
               <div className="flex gap-2 flex-wrap">
-                {selectedContribution && isAuthenticated && (
+                {selectedContribution && isAuthenticated && selectedContribution.status === 'PENDING' && (
                   <>
                     {user?.userId !== selectedContribution.userId && (
                       <button className="btn btn-primary btn-sm" onClick={() => handleModalAction(handleVoteOnContribution, selectedContribution.id)} disabled={isSubmitting}>
@@ -1300,7 +1353,7 @@ const [rejectError, setRejectError] = useState<string | null>(null);
                         {isSubmitting ? 'Voting...' : 'Vote (+1)'}
                       </button>
                     )}
-                    {user?.userId === selectedContribution.userId && selectedContribution.status === 'PENDING' && (
+                    {user?.userId === selectedContribution.userId && (
                       <>
                         {!isEditMode ? (
                           <button className="btn btn-warning btn-sm" onClick={toggleEditMode} disabled={isSubmitting}>
@@ -1343,8 +1396,6 @@ const [rejectError, setRejectError] = useState<string | null>(null);
                           </svg>
                           Exit Edit Mode
                         </button>
-                          </>
-                        )}
                         <button className="btn btn-error btn-sm" onClick={() => handleModalAction(handleCancelMyContribution, selectedContribution.id)} disabled={isSubmitting}>
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1419,6 +1470,29 @@ const [rejectError, setRejectError] = useState<string | null>(null);
                       </>
 
                     )}
+                  </>
+                )}
+
+                {/* Show completion status for completed contributions */}
+                {selectedContribution && selectedContribution.status !== 'PENDING' && (
+                  <div className="flex items-center gap-3">
+                    <div className={`badge ${
+                      selectedContribution.status === 'APPROVED' ? 'badge-success' :
+                      selectedContribution.status === 'REJECTED' ? 'badge-error' :
+                      'badge-neutral'
+                    } badge-lg`}>
+                      {selectedContribution.status}
+                    </div>
+                    <span className="text-sm text-base-content/70">
+                      {selectedContribution.status === 'APPROVED' && selectedContribution.approvedAt &&
+                        `Approved on ${new Date(selectedContribution.approvedAt).toLocaleDateString()}`}
+                      {selectedContribution.status === 'REJECTED' && selectedContribution.rejectedAt &&
+                        `Rejected on ${new Date(selectedContribution.rejectedAt).toLocaleDateString()}`}
+                      {selectedContribution.status === 'CANCELLED' && selectedContribution.cancelledAt &&
+                        `Cancelled on ${new Date(selectedContribution.cancelledAt).toLocaleDateString()}`}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Close button - right side */}

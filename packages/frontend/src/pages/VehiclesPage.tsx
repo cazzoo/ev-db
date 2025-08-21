@@ -11,6 +11,7 @@ import {
   seedContributions,
   submitContribution,
   fetchPendingContributions,
+  fetchRecentVehicles,
   Contribution,
   DuplicateError,
   PaginatedResponse,
@@ -21,6 +22,7 @@ import MultiStepContributionForm from '../components/MultiStepContributionForm';
 import DataTable, { Column } from '../components/DataTable';
 import VehicleCardGrid from '../components/VehicleCardGrid';
 import VehicleDetailsView from '../components/VehicleDetailsView';
+import SpotlightSection from '../components/SpotlightSection';
 import { AuthContext } from '../context/AuthContext';
 
 const VehiclesPage = () => {
@@ -52,6 +54,11 @@ const VehiclesPage = () => {
   });
 
   const { userRole, token } = useContext(AuthContext);
+
+  // Spotlight state
+  const [recentVehicles, setRecentVehicles] = useState<Vehicle[]>([]);
+  const [spotlightLoading, setSpotlightLoading] = useState(true);
+  const [spotlightError, setSpotlightError] = useState<string | null>(null);
 
   // Get pagination parameters from URL
   const getUrlParams = () => {
@@ -169,6 +176,23 @@ const VehiclesPage = () => {
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  // Load spotlight data
+  useEffect(() => {
+    const loadSpotlightData = async () => {
+      try {
+        setSpotlightLoading(true);
+        const data = await fetchRecentVehicles(5);
+        setRecentVehicles(data.vehicles);
+      } catch (err) {
+        setSpotlightError(err instanceof Error ? err.message : 'Failed to load recent vehicles');
+      } finally {
+        setSpotlightLoading(false);
+      }
+    };
+
+    loadSpotlightData();
   }, []);
 
   const handleShowModal = (vehicle: Vehicle | null = null) => {
@@ -439,6 +463,17 @@ const VehiclesPage = () => {
           </button>
         )}
       </div>
+
+      {/* Recent Vehicles Spotlight */}
+      <SpotlightSection
+        title="Recently Added Vehicles"
+        items={recentVehicles}
+        type="vehicles"
+        loading={spotlightLoading}
+        error={spotlightError}
+        className="mb-8"
+        onVehicleClick={handleViewVehicle}
+      />
 
       {/* View controls */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">

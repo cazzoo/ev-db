@@ -15,11 +15,11 @@
 [x] Add in-app notifications for important events (contribution approved/rejected, new message, ...etc.).
 [] Provide way to add custom fields to vehicles. The fields will be displayed into a specific step in the workflow form. We should have a way to retrieve all the available fields with the API. Sumitting a contribution with custom fields that's doesn't exist should work, we need to create the fields before. Custom fields can be administered by the admin, to rename it, determine if that is viewable from the vehicle card, vehicle details. The custom fields should be integrated the same way the other default fields (with live-edit in review, diff, ...etc.).
 [x] When clicking on a vehicle carrousel arrow, it displays the vehicle details and switches the image instead of just switching the image.
-[] I would like to have pagination for the vehicle retrieval, both the UI and API.
+[x] I would like to have pagination for the vehicle retrieval, both the UI and API.
 [] Keyboard navigation for the vehicle list.
 [] Ability to delete a vehicle while being admin.
-[] As admin, when clicking on Admin button from nav, it shows sub items, when clicking on one of this item i'm getting redirected but the sub menu is still open.
-[] Order contributions by creation date, descending. The same in personal dashboard.
+[x] As admin, when clicking on Admin button from nav, it shows sub items, when clicking on one of this item i'm getting redirected but the sub menu is still open.
+[x] Order vehicles and contributions by creation date, descending. The same in personal dashboard. I would like to have spotlight of newly added vehicles/contributions on the main page and on their respective pages.
 
 # Later
 [] Import vehicle feature: Be able to import vehicle from a remote vehicle page. This would parse the remote location, and extract the information to fill the contribution form.
