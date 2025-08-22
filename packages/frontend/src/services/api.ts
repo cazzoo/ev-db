@@ -163,6 +163,47 @@ export interface Vehicle {
   images?: VehicleImage[];
   createdAt?: string;
   isNew?: boolean;
+  // Custom fields support
+  customFields?: Record<string, any>;
+  customFieldsArray?: CustomFieldValue[];
+}
+
+/**
+ * Custom field interfaces
+ */
+export interface CustomField {
+  id: number;
+  name: string;
+  key: string;
+  fieldType: 'TEXT' | 'NUMBER' | 'DATE' | 'DROPDOWN' | 'BOOLEAN' | 'URL';
+  validationRules?: any;
+  isVisibleOnCard: boolean;
+  isVisibleOnDetails: boolean;
+  displayOrder: number;
+  usageCount: number;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: number;
+}
+
+export interface CustomFieldValue {
+  id: number;
+  name: string;
+  key: string;
+  type: string;
+  value: any;
+  isVisibleOnCard: boolean;
+  isVisibleOnDetails: boolean;
+  displayOrder: number;
+}
+
+export interface CustomFieldSuggestion {
+  id: number;
+  name: string;
+  key: string;
+  fieldType: string;
+  usageCount: number;
+  validationRules?: any;
 }
 
 /**
@@ -1822,6 +1863,175 @@ export const fetchNotificationById = async (notificationId: number): Promise<{
   if (!response.ok) {
     const data = await response.json();
     throw new Error(data.error || 'Failed to fetch notification');
+  }
+  return response.json();
+};
+
+// ============================================================================
+// CUSTOM FIELDS
+// ============================================================================
+
+/**
+ * Get custom field suggestions for forms
+ */
+export const fetchCustomFieldSuggestions = async (limit: number = 10): Promise<{ suggestions: CustomFieldSuggestion[] }> => {
+  const response = await fetch(`${API_URL}/custom-fields/suggestions?limit=${limit}`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || 'Failed to fetch custom field suggestions');
+  }
+  return response.json();
+};
+
+/**
+ * Search custom fields for autocomplete
+ */
+export const searchCustomFields = async (query: string, limit: number = 20): Promise<{ results: CustomFieldSuggestion[] }> => {
+  const response = await fetch(`${API_URL}/custom-fields/search?q=${encodeURIComponent(query)}&limit=${limit}`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || 'Failed to search custom fields');
+  }
+  return response.json();
+};
+
+/**
+ * Get all custom fields (basic info)
+ */
+export const fetchCustomFields = async (
+  sortBy: 'name' | 'usageCount' | 'createdAt' = 'usageCount',
+  sortOrder: 'asc' | 'desc' = 'desc',
+  search?: string
+): Promise<{ fields: CustomField[] }> => {
+  const params = new URLSearchParams({
+    sortBy,
+    sortOrder,
+  });
+
+  if (search) {
+    params.append('search', search);
+  }
+
+  const response = await fetch(`${API_URL}/custom-fields?${params}`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || 'Failed to fetch custom fields');
+  }
+  return response.json();
+};
+
+/**
+ * Admin: Get all custom fields with full details
+ */
+export const fetchAdminCustomFields = async (
+  sortBy: 'name' | 'usageCount' | 'createdAt' = 'usageCount',
+  sortOrder: 'asc' | 'desc' = 'desc',
+  search?: string
+): Promise<{ fields: CustomField[] }> => {
+  const params = new URLSearchParams({
+    sortBy,
+    sortOrder,
+  });
+
+  if (search) {
+    params.append('search', search);
+  }
+
+  const response = await fetch(`${API_URL}/custom-fields/admin?${params}`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || 'Failed to fetch admin custom fields');
+  }
+  return response.json();
+};
+
+/**
+ * Admin: Get single custom field by ID
+ */
+export const fetchCustomFieldById = async (id: number): Promise<{ field: CustomField }> => {
+  const response = await fetch(`${API_URL}/custom-fields/admin/${id}`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || 'Failed to fetch custom field');
+  }
+  return response.json();
+};
+
+/**
+ * Admin: Create new custom field
+ */
+export const createCustomField = async (fieldData: {
+  name: string;
+  fieldType?: string;
+  validationRules?: any;
+  isVisibleOnCard?: boolean;
+  isVisibleOnDetails?: boolean;
+  displayOrder?: number;
+}): Promise<{ message: string; field: CustomField }> => {
+  const response = await fetch(`${API_URL}/custom-fields/admin`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(fieldData),
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || 'Failed to create custom field');
+  }
+  return response.json();
+};
+
+/**
+ * Admin: Update custom field
+ */
+export const updateCustomField = async (id: number, fieldData: {
+  name?: string;
+  fieldType?: string;
+  validationRules?: any;
+  isVisibleOnCard?: boolean;
+  isVisibleOnDetails?: boolean;
+  displayOrder?: number;
+}): Promise<{ message: string; field: CustomField }> => {
+  const response = await fetch(`${API_URL}/custom-fields/admin/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(fieldData),
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || 'Failed to update custom field');
+  }
+  return response.json();
+};
+
+/**
+ * Admin: Delete custom field
+ */
+export const deleteCustomField = async (id: number): Promise<{ message: string }> => {
+  const response = await fetch(`${API_URL}/custom-fields/admin/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || 'Failed to delete custom field');
   }
   return response.json();
 };

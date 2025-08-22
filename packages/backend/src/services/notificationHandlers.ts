@@ -817,10 +817,14 @@ export class InAppHandler implements NotificationHandler {
 
     switch (notification.eventType) {
       case 'contribution.approved':
-        return '/contributions/browse';
       case 'contribution.rejected':
-        return '/contributions/browse';
       case 'contribution.submitted':
+      case 'contribution.vote_received':
+        // If we have a contribution ID, link directly to the contribution
+        if (metadata.contributionId) {
+          return `/contributions/${metadata.contributionId}`;
+        }
+        // Fallback to browse page
         return '/contributions/browse';
       case 'user.low_credits':
         return '/contribute';

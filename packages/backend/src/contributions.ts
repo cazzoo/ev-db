@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
 import { db, sqlClient } from './db';
-import { contributions, users, contributionReviews, vehicles, imageContributions, vehicleImages, moderationLogs } from './db/schema';
+import { contributions, users, contributionReviews, vehicles, imageContributions, vehicleImages, moderationLogs, vehicleCustomFieldValues } from './db/schema';
 import { eq, and, count, sql, or, desc } from 'drizzle-orm';
 import { jwtAuth, moderatorHybridAuth, hybridAuth } from './middleware/auth';
 import { checkForDuplicate, deductContributionCredit, VehicleData } from './services/vehicleDuplicateService';
 import { contributionMaintenanceModeMiddleware } from './middleware/maintenanceMode';
+import { getOrCreateCustomField, incrementUsageCount, getCustomFieldByKey } from './services/customFieldsService';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -139,6 +140,107 @@ const ensureChangeColumns = async () => {
   ensured = true;
 }
 
+// Process custom fields in vehicle data - auto-create fields that don't exist
+async function processCustomFields(vehicleData: any, userId: number): Promise<void> {
+  if (!vehicleData.customFields || typeof vehicleData.customFields !== 'object') {
+    return; // No custom fields to process
+  }
+
+  const customFields = vehicleData.customFields;
+  const fieldNames = Object.keys(customFields);
+
+  for (const fieldName of fieldNames) {
+    const fieldValue = customFields[fieldName];
+
+    // Skip empty values
+    if (fieldValue === null || fieldValue === undefined || fieldValue === '') {
+      continue;
+    }
+
+    try {
+      // Auto-create the custom field if it doesn't exist
+      const field = await getOrCreateCustomField(fieldName, userId);
+
+      // Increment usage count for the field
+      await incrementUsageCount(field.id);
+
+      console.log(`✅ Processed custom field: ${fieldName} (ID: ${field.id})`);
+    } catch (error) {
+      console.error(`❌ Error processing custom field "${fieldName}":`, error);
+      // Continue processing other fields even if one fails
+    }
+  }
+}
+
+// Create custom field values for a vehicle from contribution data
+async function createCustomFieldValues(vehicleId: number, vehicleData: any): Promise<void> {
+  if (!vehicleData.customFields || typeof vehicleData.customFields !== 'object') {
+    return; // No custom fields to create
+  }
+
+  const customFields = vehicleData.customFields;
+  const fieldNames = Object.keys(customFields);
+
+  for (const fieldName of fieldNames) {
+    const fieldValue = customFields[fieldName];
+
+    // Skip empty values
+    if (fieldValue === null || fieldValue === undefined || fieldValue === '') {
+      continue;
+    }
+
+    try {
+      // Find the custom field by name (it should exist since we processed it during submission)
+      const field = await getCustomFieldByKey(fieldName.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '_'));
+
+      if (!field) {
+        console.warn(`⚠️ Custom field not found for key: ${fieldName}`);
+        continue;
+      }
+
+      // Check if value already exists for this vehicle and field
+      const existingValue = await db
+        .select()
+        .from(vehicleCustomFieldValues)
+        .where(and(
+          eq(vehicleCustomFieldValues.vehicleId, vehicleId),
+          eq(vehicleCustomFieldValues.customFieldId, field.id)
+        ))
+        .limit(1);
+
+      const now = new Date();
+      const valueToStore = String(fieldValue); // Convert all values to string
+
+      if (existingValue.length > 0) {
+        // Update existing value
+        await db
+          .update(vehicleCustomFieldValues)
+          .set({
+            value: valueToStore,
+            updatedAt: now
+          })
+          .where(eq(vehicleCustomFieldValues.id, existingValue[0].id));
+
+        console.log(`✅ Updated custom field value: ${fieldName} = ${valueToStore} for vehicle ${vehicleId}`);
+      } else {
+        // Create new value
+        await db.insert(vehicleCustomFieldValues).values({
+          vehicleId,
+          customFieldId: field.id,
+          value: valueToStore,
+          createdAt: now,
+          updatedAt: now
+        });
+
+        console.log(`✅ Created custom field value: ${fieldName} = ${valueToStore} for vehicle ${vehicleId}`);
+      }
+    } catch (error) {
+      console.error(`❌ Error creating custom field value "${fieldName}":`, error);
+      // Continue processing other fields even if one fails
+    }
+  }
+}
+
 // Submit a new contribution (Authenticated users only)
 contributionsRouter.post('/', jwtAuth, contributionMaintenanceModeMiddleware, async (c) => {
   await ensureChangeColumns();
@@ -207,6 +309,9 @@ contributionsRouter.post('/', jwtAuth, contributionMaintenanceModeMiddleware, as
     // Credits are only deducted for API usage
     */
 
+    // Process custom fields - auto-create any new fields
+    await processCustomFields(vehicleData, userId);
+
     const newContribution = await db.insert(contributions).values({
       userId: userId,
       vehicleData: vehicleData,
@@ -238,6 +343,19 @@ contributionsRouter.post('/', jwtAuth, contributionMaintenanceModeMiddleware, as
             user: { email: contributor.email }
           }
         );
+
+        // Also send a direct notification with better formatting
+        await NotificationService.sendNotificationToUser(userId, {
+          eventType: 'contribution.submitted',
+          title: 'Contribution Submitted',
+          content: `Your ${vehicleData?.make} ${vehicleData?.model} contribution has been submitted for review.`,
+          metadata: {
+            vehicleData: vehicleData,
+            contributionId: newContribution[0].id,
+            userId: userId,
+            timestamp: new Date().toISOString()
+          }
+        });
 
         // Notify admins/moderators about new contribution
         const adminUsers = await db.select({ id: users.id, email: users.email })
@@ -592,6 +710,9 @@ contributionsRouter.post('/:id/approve', moderatorHybridAuth, async (c) => {
       const [newVehicle] = await db.insert(vehicles).values(vehicleData).returning({ id: vehicles.id });
       finalVehicleId = newVehicle.id;
     }
+
+    // Create custom field values for the vehicle
+    await createCustomFieldValues(finalVehicleId, vehicleData);
 
     // Update contribution status
     await db.update(contributions).set({ status: 'APPROVED', approvedAt: new Date() }).where(eq(contributions.id, contributionId));

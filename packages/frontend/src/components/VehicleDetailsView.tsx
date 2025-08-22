@@ -132,6 +132,32 @@ const VehicleDetailsView: React.FC<VehicleDetailsViewProps> = ({ vehicle, onClos
         </div>
       )}
 
+      {/* Custom Fields */}
+      {vehicle.customFieldsArray && vehicle.customFieldsArray.length > 0 && (
+        <div>
+          <h3 className="text-lg font-semibold mb-3">Custom Fields</h3>
+          <div className="card bg-base-100 border border-base-300">
+            <div className="card-body p-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {vehicle.customFieldsArray
+                  .filter(field => field.isVisibleOnDetails && field.value !== null && field.value !== undefined && field.value !== '')
+                  .sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name))
+                  .map(field => {
+                    const displayValue = typeof field.value === 'boolean' ? (field.value ? 'Yes' : 'No') : String(field.value);
+                    return (
+                      <div key={field.key} className="flex justify-between items-start">
+                        <span className="text-base-content/70 font-medium mr-3">{field.name}:</span>
+                        <span className="font-medium text-right break-words">{displayValue}</span>
+                      </div>
+                    );
+                  })
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div className="flex justify-end gap-2 pt-4 border-t border-base-300">
         <button

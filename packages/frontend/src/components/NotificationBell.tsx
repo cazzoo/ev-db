@@ -45,6 +45,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
       case 'contribution.rejected':
       case 'contribution.submitted':
       case 'contribution.vote_received':
+        // Note: This is a fallback - normally actionUrl should be provided with specific contribution ID
         return '/contributions/browse';
       case 'user.low_credits':
         return '/contribute';

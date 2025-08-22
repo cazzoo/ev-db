@@ -78,15 +78,32 @@ const ContributionDetailPage: React.FC = () => {
     return <div className={`badge ${config.class}`}>{config.text}</div>;
   };
 
-  const getChangeTypeBadge = (changeType: string) => {
+  const getChangeTypeBadge = (changeType: string, contribution?: Contribution) => {
+    // For NEW contributions, we need to determine if it's truly new or a variant
+    if (changeType === 'NEW' && contribution) {
+      // This is a simplified check - in a full implementation, you'd want to
+      // check if there are existing vehicles with same make/model/similar year
+      const isVariant = false; // TODO: Implement proper variant detection
+
+      return (
+        <div className={`badge ${isVariant ? 'badge-success' : 'badge-primary'}`}>
+          {isVariant ? 'Variant' : 'New Vehicle'}
+        </div>
+      );
+    }
+
     const typeConfig = {
-      NEW: { class: 'badge-primary', text: 'New Vehicle' },
       UPDATE: { class: 'badge-info', text: 'Update' },
       DELETE: { class: 'badge-error', text: 'Delete' },
     };
 
-    const config = typeConfig[changeType as keyof typeof typeConfig] || typeConfig.NEW;
-    return <div className={`badge ${config.class}`}>{config.text}</div>;
+    const config = typeConfig[changeType as keyof typeof typeConfig];
+    if (config) {
+      return <div className={`badge ${config.class}`}>{config.text}</div>;
+    }
+
+    // Fallback for unknown types
+    return <div className="badge badge-neutral">{changeType}</div>;
   };
 
   const formatDate = (dateString: string) => {
@@ -149,8 +166,8 @@ const ContributionDetailPage: React.FC = () => {
     );
   }
 
-  const vehicleData = typeof contribution.vehicleData === 'string' 
-    ? JSON.parse(contribution.vehicleData) 
+  const vehicleData = typeof contribution.vehicleData === 'string'
+    ? JSON.parse(contribution.vehicleData)
     : contribution.vehicleData;
 
   return (
@@ -165,7 +182,7 @@ const ContributionDetailPage: React.FC = () => {
         </div>
         <div className="flex gap-2">
           {getStatusBadge(contribution.status)}
-          {getChangeTypeBadge(contribution.changeType)}
+          {getChangeTypeBadge(contribution.changeType, contribution)}
         </div>
       </div>
 
@@ -183,7 +200,7 @@ const ContributionDetailPage: React.FC = () => {
                 </span>
               </div>
             </div>
-            
+
             {contribution.approvedAt && (
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 bg-success rounded-full"></div>
@@ -195,7 +212,7 @@ const ContributionDetailPage: React.FC = () => {
                 </div>
               </div>
             )}
-            
+
             {contribution.rejectedAt && (
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 bg-error rounded-full"></div>
@@ -207,7 +224,7 @@ const ContributionDetailPage: React.FC = () => {
                 </div>
               </div>
             )}
-            
+
             {contribution.cancelledAt && (
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 bg-neutral rounded-full"></div>
@@ -271,7 +288,7 @@ const ContributionDetailPage: React.FC = () => {
               </div>
             </div>
           </div>
-          
+
           {vehicleData.description && (
             <div className="mt-4">
               <label className="label">

@@ -183,6 +183,38 @@ const InlineEditableVehicleDetails = ({
           </div>
         </div>
 
+        {/* Custom Fields Section for variant proposals */}
+        {(vehicleData.customFields && Object.keys(vehicleData.customFields).length > 0) && (
+          <div className="card bg-base-100 shadow-sm">
+            <div className="card-body">
+              <h5 className="card-title text-lg mb-4">Custom Fields</h5>
+              <div className={isEditMode ? 'space-y-1' : 'space-y-2'}>
+                {Object.entries(vehicleData.customFields).map(([key, value]) => {
+                  if (value === null || value === undefined || value === '') return null;
+
+                  const displayName = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+                  return (
+                    <EditableField
+                      key={key}
+                      contributionId={contribution.id}
+                      fieldName={`customFields.${key}`}
+                      value={value}
+                      type={typeof value === 'number' ? 'number' : 'text'}
+                      label={displayName}
+                      isEditable={isEditable}
+                      isEditMode={isEditMode}
+                      getDraftValue={getDraftValue}
+                      isFieldModified={isFieldModified}
+                      updateDraftField={updateDraftField}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Images section for variant proposals */}
         {imageContributions.length > 0 && (
           <div className="card bg-base-100 shadow-sm">
@@ -327,6 +359,41 @@ const InlineEditableVehicleDetails = ({
             </div>
           </div>
         </div>
+
+        {/* Custom Fields Section */}
+        {(vehicleData.customFields && Object.keys(vehicleData.customFields).length > 0) && (
+          <div className="card bg-base-100 shadow-sm">
+            <div className="card-body">
+              <h5 className="card-title text-lg mb-4">Custom Fields</h5>
+              <div className={isEditMode ? 'space-y-1' : 'space-y-2'}>
+                {Object.entries(vehicleData.customFields).map(([key, value]) => {
+                  if (value === null || value === undefined || value === '') return null;
+
+                  const displayName = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                  const originalCustomFieldValue = original?.customFields?.[key];
+
+                  return (
+                    <EditableField
+                      key={key}
+                      contributionId={contribution.id}
+                      fieldName={`customFields.${key}`}
+                      value={value}
+                      type={typeof value === 'number' ? 'number' : 'text'}
+                      label={displayName}
+                      isEditable={isEditable}
+                      isEditMode={isEditMode}
+                      getDraftValue={getDraftValue}
+                      isFieldModified={isFieldModified}
+                      updateDraftField={updateDraftField}
+                      originalValue={originalCustomFieldValue}
+                      showDiff={!!original}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Images section for updates/variants */}
@@ -941,11 +1008,25 @@ const [rejectError, setRejectError] = useState<string | null>(null);
       key: 'changeType',
       header: 'Change Type',
       accessor: 'changeType',
-      render: (value) => (
-        <div className={`badge ${value === 'NEW' ? 'badge-success' : 'badge-warning'}`}>
-          {String(value || 'N/A')}
-        </div>
-      ),
+      render: (value, contribution) => {
+        if (value === 'NEW') {
+          // Check if this is a variant by looking for similar existing vehicles
+          const referenceVehicle = findReferenceVehicle(contribution, allVehicles);
+          const isVariant = !!referenceVehicle;
+
+          return (
+            <div className={`badge ${isVariant ? 'badge-success' : 'badge-primary'}`}>
+              {isVariant ? 'VARIANT' : 'NEW VEHICLE'}
+            </div>
+          );
+        }
+
+        return (
+          <div className={`badge ${value === 'UPDATE' ? 'badge-warning' : 'badge-neutral'}`}>
+            {String(value || 'N/A')}
+          </div>
+        );
+      },
     },
     {
       key: 'vehicle',
@@ -1158,8 +1239,14 @@ const [rejectError, setRejectError] = useState<string | null>(null);
               <div className="flex items-center gap-3 mb-2">
                 <h3 className="font-bold text-lg">Proposal #{selectedContribution?.id}</h3>
                 {selectedContribution && (
-                  <div className={`badge ${selectedContribution.changeType === 'NEW' ? 'badge-success' : 'badge-warning'}`}>
-                    {selectedContribution.changeType === 'NEW' ? 'VARIANT' : 'UPDATE'}
+                  <div className={`badge ${
+                    selectedContribution.changeType === 'NEW'
+                      ? (originalVehicle ? 'badge-success' : 'badge-primary')
+                      : 'badge-warning'
+                  }`}>
+                    {selectedContribution.changeType === 'NEW'
+                      ? (originalVehicle ? 'VARIANT' : 'NEW VEHICLE')
+                      : 'UPDATE'}
                   </div>
                 )}
                 {selectedContribution?.status === 'REJECTED' && selectedContribution?.rejectionComment && (
@@ -1203,8 +1290,15 @@ const [rejectError, setRejectError] = useState<string | null>(null);
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <div className="badge badge-info badge-xs">VARIANT</div>
-                      <span>Variant of {selectedContribution.vehicleData.year} {selectedContribution.vehicleData.make} {selectedContribution.vehicleData.model}</span>
+                      <div className={`badge badge-xs ${originalVehicle ? 'badge-info' : 'badge-primary'}`}>
+                        {originalVehicle ? 'VARIANT' : 'NEW VEHICLE'}
+                      </div>
+                      <span>
+                        {originalVehicle
+                          ? `Variant of ${selectedContribution.vehicleData.year} ${selectedContribution.vehicleData.make} ${selectedContribution.vehicleData.model}`
+                          : `New vehicle: ${selectedContribution.vehicleData.year} ${selectedContribution.vehicleData.make} ${selectedContribution.vehicleData.model}`
+                        }
+                      </span>
                       {originalVehicle && (
                         <div className="badge badge-outline badge-xs">Compared to ID: {originalVehicle.id}</div>
                       )}

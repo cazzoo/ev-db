@@ -442,7 +442,7 @@ export class NotificationService {
         APNS: { content: "Your contribution for {{vehicleData.make}} {{vehicleData.model}} has been approved!" },
         WEB_PUSH: { content: "Your contribution for {{vehicleData.make}} {{vehicleData.model}} has been approved!" },
         SMS: { content: "EV DB: Your contribution for {{vehicleData.make}} {{vehicleData.model}} has been approved!" },
-        IN_APP: { content: "Your contribution has been approved!" },
+        IN_APP: { content: "Your {{vehicleData.make}} {{vehicleData.model}} contribution has been approved! 🎉" },
         RSS: { content: "Contribution approved: {{vehicleData.make}} {{vehicleData.model}}" },
       },
       'contribution.rejected': {
@@ -461,7 +461,7 @@ export class NotificationService {
         APNS: { content: "Your contribution was rejected: {{rejectionComment}}" },
         WEB_PUSH: { content: "Your contribution was rejected: {{rejectionComment}}" },
         SMS: { content: "EV DB: Your contribution was rejected. Check your email for details." },
-        IN_APP: { content: "Your contribution was rejected" },
+        IN_APP: { content: "Your {{vehicleData.make}} {{vehicleData.model}} contribution needs attention" },
         RSS: { content: "Contribution rejected: {{vehicleData.make}} {{vehicleData.model}}" },
       },
       // Additional event types would be defined here...
@@ -477,7 +477,7 @@ export class NotificationService {
         APNS: { content: "New contribution submitted" },
         WEB_PUSH: { content: "New contribution submitted" },
         SMS: { content: "New contribution submitted" },
-        IN_APP: { content: "New contribution submitted" },
+        IN_APP: { content: "Your {{vehicleData.make}} {{vehicleData.model}} contribution has been submitted for review" },
         RSS: { content: "New contribution submitted" },
       },
       'user.registered': {

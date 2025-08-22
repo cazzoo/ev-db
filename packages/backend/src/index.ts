@@ -25,6 +25,7 @@ import contributionsRouter from './contributions'
 import seedRouter from './seed'
 import adminRouter from './admin'
 import { imagesRouter } from './images'
+import customFieldsRouter from './customFields'
 import apiKeysRouter from './routes/apiKeys'
 import webhooksRouter from './routes/webhooks'
 import usersRouter from './routes/users'
@@ -189,6 +190,7 @@ app.route('/auth', auth)
 app.route('/vehicles', vehiclesRouter)
 app.route('/contributions', contributionsRouter)
 app.route('/images', imagesRouter)
+app.route('/custom-fields', customFieldsRouter)
 app.route('/apikeys', apiKeysRouter)
 // Mount specific admin routes BEFORE the general /admin route
 app.route('/admin/webhooks', webhooksRouter)

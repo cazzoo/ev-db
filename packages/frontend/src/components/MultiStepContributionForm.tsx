@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Vehicle, fetchVehicleSuggestions, VehicleSuggestions, checkForDuplicate, DuplicateCheckResult } from '../services/api';
 import { AutocompleteInput } from './AutocompleteInput';
+import { CustomFieldsList } from './CustomFieldsList';
 import { Form, Input, Textarea, Button } from '../design-system';
 
 interface ImageWithMetadata {
@@ -31,6 +32,7 @@ interface FormData {
   price: number;
   description: string;
   images: ImageWithMetadata[];
+  customFields: Record<string, any>;
 }
 
 interface StepValidation {
@@ -66,7 +68,8 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
     topSpeed: initialData?.topSpeed || 0,
     price: initialData?.price || 0,
     description: initialData?.description || '',
-    images: []
+    images: [],
+    customFields: initialData?.customFields || {}
   });
 
   // Autocomplete and validation state
@@ -91,7 +94,7 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
   }, []);
 
   // Update form data
-  const updateFormData = useCallback((field: keyof FormData, value: string | number) => {
+  const updateFormData = useCallback((field: keyof FormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   }, []);
 
@@ -256,7 +259,8 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
       acceleration: formData.acceleration || undefined,
       topSpeed: formData.topSpeed || undefined,
       price: formData.price || undefined,
-      description: formData.description || undefined
+      description: formData.description || undefined,
+      customFields: Object.keys(formData.customFields).length > 0 ? formData.customFields : undefined
     };
 
     onSubmit(vehicleData, changeType, targetVehicleId, formData.images);
@@ -458,6 +462,14 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
                   placeholder="Add specifications, trims, market notes, etc."
                   rows={4}
                   helperText="Optional - Additional details about the vehicle"
+                />
+
+                {/* Custom Fields Section */}
+                <div className="divider">Custom Fields</div>
+                <CustomFieldsList
+                  customFields={formData.customFields}
+                  onChange={(customFields) => updateFormData('customFields', customFields)}
+                  errors={{}}
                 />
               </>
             )}
@@ -664,6 +676,29 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
                       <div className="card-body">
                         <h3 className="card-title text-lg">Description</h3>
                         <p className="text-sm">{formData.description}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Custom Fields section */}
+                  {Object.keys(formData.customFields).length > 0 && (
+                    <div className="card bg-base-200">
+                      <div className="card-body">
+                        <h3 className="card-title text-lg">Custom Fields</h3>
+                        <div className="space-y-2">
+                          {Object.entries(formData.customFields).map(([key, value]) => {
+                            if (value === null || value === undefined || value === '') return null;
+
+                            const displayName = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                            const displayValue = typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value);
+
+                            return (
+                              <div key={key}>
+                                <strong>{displayName}:</strong> {displayValue}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   )}

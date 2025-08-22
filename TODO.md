@@ -13,7 +13,8 @@
 [x] As admin, we need to be able to configure application settings, such as notifications, webhooks, email, ...etc.
 [] Add audit trail for settings changes.
 [x] Add in-app notifications for important events (contribution approved/rejected, new message, ...etc.).
-[] Provide way to add custom fields to vehicles. The fields will be displayed into a specific step in the workflow form. We should have a way to retrieve all the available fields with the API. Sumitting a contribution with custom fields that's doesn't exist should work, we need to create the fields before. Custom fields can be administered by the admin, to rename it, determine if that is viewable from the vehicle card, vehicle details. The custom fields should be integrated the same way the other default fields (with live-edit in review, diff, ...etc.).
+[x] Provide way to add custom fields to vehicles. The fields will be displayed into a specific step in the workflow form. We should have a way to retrieve all the available fields with the API. Sumitting a contribution with custom fields that's doesn't exist should work, we need to create the fields before. Custom fields can be administered by the admin, to rename it, determine if that is viewable from the vehicle card, vehicle details. The custom fields should be integrated the same way the other default fields (with live-edit in review, diff, ...etc.).
+No need to keep backward compatibility.
 [x] When clicking on a vehicle carrousel arrow, it displays the vehicle details and switches the image instead of just switching the image.
 [x] I would like to have pagination for the vehicle retrieval, both the UI and API.
 [] Keyboard navigation for the vehicle list.

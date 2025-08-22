@@ -13,6 +13,7 @@ import AdminRoute from './components/AdminRoute';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import AdminSettingsPage from './pages/AdminSettingsPage';
 import UserManagementPage from './pages/UserManagementPage';
+import CustomFieldsManagementPage from './pages/admin/CustomFieldsManagementPage';
 import ApiDocumentationPage from './pages/ApiDocumentationPage';
 import NotificationsPage from './pages/NotificationsPage';
 import NotificationManagementPage from './pages/admin/NotificationManagementPage';
@@ -65,6 +66,11 @@ function App() {
                 <Route path="/admin/users" element={
                   <AdminRoute>
                     <UserManagementPage />
+                  </AdminRoute>
+                } />
+                <Route path="/admin/custom-fields" element={
+                  <AdminRoute>
+                    <CustomFieldsManagementPage />
                   </AdminRoute>
                 } />
                 <Route path="/admin/notifications" element={

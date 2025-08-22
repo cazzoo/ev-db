@@ -15,6 +15,13 @@
       "when": 1755792311065,
       "tag": "0001_narrow_bucky",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1755814436742,
+      "tag": "0002_unknown_wind_dancer",
+      "breakpoints": true
     }
   ]
 }

@@ -6,7 +6,8 @@ import {
   UserGroupIcon,
   CurrencyDollarIcon,
   ChartBarIcon,
-  Cog6ToothIcon
+  Cog6ToothIcon,
+  TagIcon
 } from '@heroicons/react/24/outline';
 import EnhancedStats from '../components/EnhancedStats';
 import DevAdminActions from '../components/DevAdminActions';
@@ -228,6 +229,10 @@ const AdminDashboardPage = () => {
             <Link to="/admin/users?role=MODERATOR" className="btn btn-outline btn-accent">
               <Cog6ToothIcon className="h-5 w-5" />
               View Moderators
+            </Link>
+            <Link to="/admin/custom-fields" className="btn btn-outline btn-success">
+              <TagIcon className="h-5 w-5" />
+              Custom Fields
             </Link>
           </div>
         </div>

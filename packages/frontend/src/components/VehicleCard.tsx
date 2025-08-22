@@ -165,6 +165,25 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
               <span className="font-medium">{vehicle.acceleration}s</span>
             </div>
           )}
+
+          {/* Custom fields visible on card */}
+          {vehicle.customFieldsArray && vehicle.customFieldsArray
+            .filter(field => field.isVisibleOnCard && field.value !== null && field.value !== undefined && field.value !== '')
+            .slice(0, 3) // Limit to 3 custom fields on card for space
+            .map(field => {
+              const displayValue = typeof field.value === 'boolean' ? (field.value ? 'Yes' : 'No') : String(field.value);
+              return (
+                <div key={field.key} className="flex justify-between items-center text-xs leading-tight">
+                  <span className="text-base-content/60 truncate" title={field.name}>
+                    {field.name.length > 12 ? field.name.substring(0, 12) + '...' : field.name}:
+                  </span>
+                  <span className="font-medium truncate ml-1" title={displayValue}>
+                    {displayValue.length > 15 ? displayValue.substring(0, 15) + '...' : displayValue}
+                  </span>
+                </div>
+              );
+            })
+          }
         </div>
       </CardBody>
 

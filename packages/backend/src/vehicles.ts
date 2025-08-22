@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { db } from './db';
-import { vehicles } from './db/schema';
+import { vehicles, vehicleCustomFieldValues, customFields } from './db/schema';
 import { eq, like, or, count, asc, desc } from 'drizzle-orm';
 import { jwt } from 'hono/jwt';
 import { apiKeyAuth } from './middleware/apiKeyAuth';
@@ -12,6 +12,137 @@ import { getVehicleImages, getImagesForVehicles } from './services/imageService'
 const vehiclesRouter = new Hono();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'; // Should be the same as in index.ts
+
+// Get custom field values for a vehicle
+async function getVehicleCustomFields(vehicleId: number) {
+  const customFieldValues = await db
+    .select({
+      fieldId: customFields.id,
+      fieldName: customFields.name,
+      fieldKey: customFields.key,
+      fieldType: customFields.fieldType,
+      value: vehicleCustomFieldValues.value,
+      isVisibleOnCard: customFields.isVisibleOnCard,
+      isVisibleOnDetails: customFields.isVisibleOnDetails,
+      displayOrder: customFields.displayOrder
+    })
+    .from(vehicleCustomFieldValues)
+    .innerJoin(customFields, eq(vehicleCustomFieldValues.customFieldId, customFields.id))
+    .where(eq(vehicleCustomFieldValues.vehicleId, vehicleId))
+    .orderBy(customFields.displayOrder, customFields.name);
+
+  // Convert to a more convenient format
+  const customFieldsMap: Record<string, any> = {};
+  const customFieldsArray: any[] = [];
+
+  for (const field of customFieldValues) {
+    const processedValue = processCustomFieldValue(field.value, field.fieldType);
+
+    customFieldsMap[field.fieldKey] = processedValue;
+    customFieldsArray.push({
+      id: field.fieldId,
+      name: field.fieldName,
+      key: field.fieldKey,
+      type: field.fieldType,
+      value: processedValue,
+      isVisibleOnCard: field.isVisibleOnCard,
+      isVisibleOnDetails: field.isVisibleOnDetails,
+      displayOrder: field.displayOrder
+    });
+  }
+
+  return {
+    customFields: customFieldsMap, // For easy access by key
+    customFieldsArray: customFieldsArray // For ordered display
+  };
+}
+
+// Get custom field values for multiple vehicles (optimized for lists)
+async function getCustomFieldsForVehicles(vehicleIds: number[], cardOnly: boolean = false) {
+  if (vehicleIds.length === 0) {
+    return {};
+  }
+
+  let query = db
+    .select({
+      vehicleId: vehicleCustomFieldValues.vehicleId,
+      fieldId: customFields.id,
+      fieldName: customFields.name,
+      fieldKey: customFields.key,
+      fieldType: customFields.fieldType,
+      value: vehicleCustomFieldValues.value,
+      isVisibleOnCard: customFields.isVisibleOnCard,
+      isVisibleOnDetails: customFields.isVisibleOnDetails,
+      displayOrder: customFields.displayOrder
+    })
+    .from(vehicleCustomFieldValues)
+    .innerJoin(customFields, eq(vehicleCustomFieldValues.customFieldId, customFields.id))
+    .where(eq(vehicleCustomFieldValues.vehicleId, vehicleIds[0])); // Start with first ID
+
+  // Add OR conditions for other vehicle IDs
+  if (vehicleIds.length > 1) {
+    const orConditions = vehicleIds.slice(1).map(id => eq(vehicleCustomFieldValues.vehicleId, id));
+    query = query.where(or(eq(vehicleCustomFieldValues.vehicleId, vehicleIds[0]), ...orConditions));
+  }
+
+  // Filter by visibility if needed
+  if (cardOnly) {
+    query = query.where(eq(customFields.isVisibleOnCard, true));
+  }
+
+  const results = await query.orderBy(customFields.displayOrder, customFields.name);
+
+  // Group by vehicle ID
+  const customFieldsByVehicle: Record<number, any> = {};
+
+  for (const result of results) {
+    if (!customFieldsByVehicle[result.vehicleId]) {
+      customFieldsByVehicle[result.vehicleId] = {
+        customFields: {},
+        customFieldsArray: []
+      };
+    }
+
+    const processedValue = processCustomFieldValue(result.value, result.fieldType);
+
+    customFieldsByVehicle[result.vehicleId].customFields[result.fieldKey] = processedValue;
+    customFieldsByVehicle[result.vehicleId].customFieldsArray.push({
+      id: result.fieldId,
+      name: result.fieldName,
+      key: result.fieldKey,
+      type: result.fieldType,
+      value: processedValue,
+      isVisibleOnCard: result.isVisibleOnCard,
+      isVisibleOnDetails: result.isVisibleOnDetails,
+      displayOrder: result.displayOrder
+    });
+  }
+
+  return customFieldsByVehicle;
+}
+
+// Process custom field value based on field type
+function processCustomFieldValue(value: string | null, fieldType: string): any {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  switch (fieldType) {
+    case 'NUMBER':
+      const num = parseFloat(value);
+      return isNaN(num) ? null : num;
+    case 'BOOLEAN':
+      return value.toLowerCase() === 'true' || value === '1';
+    case 'DATE':
+      const date = new Date(value);
+      return isNaN(date.getTime()) ? null : date.toISOString();
+    case 'DROPDOWN':
+    case 'TEXT':
+    case 'URL':
+    default:
+      return value;
+  }
+}
 
 // Apply API key authentication and rate limiting to all vehicle routes
 vehiclesRouter.use('*', apiKeyAuth, rateLimitMiddleware);
@@ -121,10 +252,14 @@ vehiclesRouter.get('/', async (c) => {
     const vehicleIds = paginatedVehicles.map(v => v.id);
     const imagesByVehicle = await getImagesForVehicles(vehicleIds);
 
-    // Combine vehicles with their images
+    // Get custom fields for paginated vehicles (only card-visible fields for performance)
+    const customFieldsByVehicle = await getCustomFieldsForVehicles(vehicleIds, true);
+
+    // Combine vehicles with their images and custom fields
     const vehiclesWithImages = paginatedVehicles.map(vehicle => ({
       ...vehicle,
-      images: imagesByVehicle[vehicle.id] || []
+      images: imagesByVehicle[vehicle.id] || [],
+      ...(customFieldsByVehicle[vehicle.id] || { customFields: {}, customFieldsArray: [] })
     }));
 
     // Calculate pagination metadata
@@ -165,9 +300,13 @@ vehiclesRouter.get('/:id', async (c) => {
   // Get images for this vehicle
   const images = await getVehicleImages(id);
 
+  // Get custom fields for this vehicle
+  const customFieldsData = await getVehicleCustomFields(id);
+
   return c.json({
     ...vehicle[0],
-    images
+    images,
+    ...customFieldsData
   });
 });
 
@@ -272,3 +411,6 @@ vehiclesRouter.delete('/:id', ...adminAuth, async (c) => {
 */
 
 export default vehiclesRouter;
+
+// Export helper functions for testing and other modules
+export { getVehicleCustomFields, getCustomFieldsForVehicles, processCustomFieldValue };

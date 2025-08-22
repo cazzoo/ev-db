@@ -397,3 +397,39 @@ export const webhookConfigurations = sqliteTable('webhook_configurations', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
+
+export const customFields = sqliteTable('custom_fields', {
+  id: integer('id').primaryKey(),
+  name: text('name').notNull(), // Display name (e.g., "Warranty Period")
+  key: text('key').notNull().unique(), // Unique slug (e.g., "warranty_period")
+  fieldType: text('field_type', {
+    enum: ['TEXT', 'NUMBER', 'DATE', 'DROPDOWN', 'BOOLEAN', 'URL']
+  }).notNull().default('TEXT'),
+  validationRules: text('validation_rules'), // JSON string with validation rules
+  isVisibleOnCard: integer('is_visible_on_card', { mode: 'boolean' }).notNull().default(false),
+  isVisibleOnDetails: integer('is_visible_on_details', { mode: 'boolean' }).notNull().default(true),
+  displayOrder: integer('display_order').notNull().default(0),
+  usageCount: integer('usage_count').notNull().default(0),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  createdBy: integer('created_by').references(() => users.id),
+}, (table) => ({
+  keyIdx: index('custom_fields_key_idx').on(table.key),
+  usageCountIdx: index('custom_fields_usage_count_idx').on(table.usageCount),
+  nameIdx: index('custom_fields_name_idx').on(table.name),
+}));
+
+export const vehicleCustomFieldValues = sqliteTable('vehicle_custom_field_values', {
+  id: integer('id').primaryKey(),
+  vehicleId: integer('vehicle_id').notNull().references(() => vehicles.id, { onDelete: 'cascade' }),
+  customFieldId: integer('custom_field_id').notNull().references(() => customFields.id, { onDelete: 'cascade' }),
+  value: text('value'), // Store all values as text, convert based on field_type
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  vehicleFieldIdx: index('vehicle_custom_field_values_vehicle_field_idx').on(table.vehicleId, table.customFieldId),
+  vehicleIdx: index('vehicle_custom_field_values_vehicle_idx').on(table.vehicleId),
+  fieldIdx: index('vehicle_custom_field_values_field_idx').on(table.customFieldId),
+  // Ensure unique combination of vehicle and custom field
+  vehicleFieldUnique: index('vehicle_custom_field_values_unique_idx').on(table.vehicleId, table.customFieldId),
+}));
