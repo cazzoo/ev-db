@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TrashIcon, ExclamationTriangleIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline';
 import { wipeAllVehicles, wipeAllContributions, cleanupOrphanedContributions } from '../services/api';
 
@@ -16,6 +16,34 @@ const DevAdminActions = ({ onSuccess, onError }: DevAdminActionsProps) => {
 
   // Check if we're in development mode
   const isDevelopment = (import.meta as { env: { MODE: string } }).env?.MODE === 'development';
+
+  // Handle escape key for vehicle confirmation modal
+  useEffect(() => {
+    if (!showVehicleConfirm) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowVehicleConfirm(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [showVehicleConfirm]);
+
+  // Handle escape key for contribution confirmation modal
+  useEffect(() => {
+    if (!showContributionConfirm) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowContributionConfirm(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [showContributionConfirm]);
 
   if (!isDevelopment) {
     return null; // Don't render anything in production

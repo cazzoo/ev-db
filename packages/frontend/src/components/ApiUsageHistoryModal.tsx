@@ -97,6 +97,20 @@ const ApiUsageHistoryModal = ({ isOpen, onClose, apiKeys, dailyUsage, dailyUsage
     processUsageData();
   }, [dailyUsage, dailyUsagePerKey, selectedApiKey, dateRange, isOpen]);
 
+  // Handle escape key
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose]);
+
   const columns: Column<ExtendedDailyUsage>[] = [
     {
       key: 'formattedDate',

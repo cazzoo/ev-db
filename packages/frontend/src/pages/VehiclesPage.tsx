@@ -195,6 +195,20 @@ const VehiclesPage = () => {
     loadSpotlightData();
   }, []);
 
+  // Handle escape key for modal
+  useEffect(() => {
+    if (!showModal) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        handleCloseModal();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [showModal]);
+
   const handleShowModal = (vehicle: Vehicle | null = null) => {
     setCurrentVehicle(vehicle);
     setModalMode('edit');

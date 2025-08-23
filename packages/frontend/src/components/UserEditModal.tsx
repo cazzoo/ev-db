@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { updateAdminUser, AdminUser, deleteUserAvatar, UserRole } from '../services/api';
 import Avatar from './Avatar';
 import { XMarkIcon, TrashIcon } from '@heroicons/react/24/outline';
@@ -20,6 +20,18 @@ const UserEditModal = ({ user, onClose, onUserUpdated }: UserEditModalProps) => 
   const [error, setError] = useState<string | null>(null);
   const [avatarRemoved, setAvatarRemoved] = useState(false);
   const [removingAvatar, setRemovingAvatar] = useState(false);
+
+  // Handle escape key
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

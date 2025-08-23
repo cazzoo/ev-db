@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef, useImperativeHandle, useRef, useEffect } from 'react';
 import { Vehicle, Contribution } from '../services/api';
 import { Card, CardHeader, CardBody, CardFooter } from '../design-system/components/Card';
 import { Button } from '../design-system/components/Button';
@@ -15,9 +15,15 @@ interface VehicleCardProps {
   userRole?: string;
   pendingContributions?: Contribution[];
   isAuthenticated?: boolean;
+  // Keyboard navigation props
+  isFocused?: boolean;
+  tabIndex?: number;
+  role?: string;
+  'aria-selected'?: boolean;
+  'data-card-index'?: number;
 }
 
-const VehicleCard: React.FC<VehicleCardProps> = ({
+const VehicleCard = forwardRef<HTMLDivElement, VehicleCardProps>(({
   vehicle,
   onEdit,
   onView,
@@ -26,8 +32,24 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
   showActions = true,
   userRole,
   pendingContributions = [],
-  isAuthenticated = false
-}) => {
+  isAuthenticated = false,
+  isFocused = false,
+  tabIndex = 0,
+  role = "button",
+  'aria-selected': ariaSelected = false,
+  'data-card-index': dataCardIndex
+}, ref) => {
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Expose the card element to parent components
+  useImperativeHandle(ref, () => cardRef.current!, []);
+
+  // Handle focus styling when focused via keyboard navigation
+  useEffect(() => {
+    if (isFocused && cardRef.current) {
+      cardRef.current.focus();
+    }
+  }, [isFocused]);
 
 
   const handleCardClick = () => {
@@ -58,9 +80,17 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Only handle Enter/Space when this card has focus
+    // Arrow keys are handled by the parent grid component
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
+      e.stopPropagation(); // Prevent event from bubbling to grid
       handleCardClick();
+    }
+    // Tab key should move focus to interactive elements within the card
+    else if (e.key === 'Tab') {
+      // Allow default tab behavior for navigating within card
+      // The first focusable element will be the first button
     }
   };
 
@@ -81,16 +111,21 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
 
   return (
     <Card
+      ref={cardRef}
       variant="default"
       size="md"
       hover
       interactive
-      className="h-full cursor-pointer transition-all duration-200 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+      className={`h-full cursor-pointer transition-all duration-200 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+        isFocused ? 'ring-2 ring-primary ring-offset-2 shadow-xl' : ''
+      }`}
       onClick={handleCardClick}
+      data-card-index={dataCardIndex}
       onKeyDown={handleKeyDown}
-      tabIndex={0}
-      role="button"
+      tabIndex={tabIndex}
+      role={role}
       aria-label={`View details for ${vehicle.make} ${vehicle.model} ${vehicle.year}`}
+      aria-selected={ariaSelected}
     >
       {/* Vehicle Image Carousel */}
       <figure className="relative h-32 overflow-hidden">
@@ -273,6 +308,8 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
       )}
     </Card>
   );
-};
+});
+
+VehicleCard.displayName = 'VehicleCard';
 
 export default VehicleCard;

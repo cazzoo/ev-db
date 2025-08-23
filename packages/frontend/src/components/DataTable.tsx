@@ -1,4 +1,4 @@
-import { useState, useMemo, ReactNode } from 'react';
+import { useState, useMemo, ReactNode, useRef } from 'react';
 import { MagnifyingGlassIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 
 export interface Column<T> {
@@ -59,6 +59,9 @@ export function DataTable<T extends Record<string, any>>({
     direction: 'asc' | 'desc';
   } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Table ref for basic functionality
+  const tableRef = useRef<HTMLTableElement>(null);
 
   // Filter and sort data
   const processedData = useMemo(() => {
@@ -136,6 +139,8 @@ export function DataTable<T extends Record<string, any>>({
       setCurrentPage(1);
     }
   }, [totalPages, currentPage]);
+
+  // No keyboard navigation - removed for simplicity
 
   const handleSort = (columnKey: string) => {
     if (!sortable) return;
@@ -295,7 +300,11 @@ export function DataTable<T extends Record<string, any>>({
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className={tableClasses}>
+          <table
+            ref={tableRef}
+            className={tableClasses}
+            role="table"
+          >
             <thead>
               <tr>
                 {columns.map((column) => {
@@ -323,8 +332,9 @@ export function DataTable<T extends Record<string, any>>({
               {paginatedData.map((item, index) => (
                 <tr
                   key={index}
-                  className={onRowClick ? 'cursor-pointer hover:bg-base-200' : ''}
+                  className={`${onRowClick ? 'cursor-pointer hover:bg-base-200' : ''}`}
                   onClick={() => onRowClick?.(item, index)}
+                  role="row"
                 >
                   {columns.map((column) => {
                     const showColumn = column.show !== false &&
