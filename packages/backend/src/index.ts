@@ -33,6 +33,8 @@ import generalRouter from './routes/general'
 import notificationsRouter from './routes/notifications'
 import { adminNotificationsRouter } from './routes/adminNotifications'
 import { changelogsRouter } from './routes/changelogs'
+import { gitChangelogsRouter } from './routes/gitChangelogs'
+import { gitWebhooksRouter } from './routes/gitWebhooks'
 import { jobScheduler } from './services/scheduledJobs'
 // Import notification processor to ensure it starts
 import './services/notificationProcessor'
@@ -197,6 +199,8 @@ app.route('/admin/webhooks', webhooksRouter)
 app.route('/admin/notifications', adminNotificationsRouter)
 app.route('/admin', adminRouter)
 app.route('/changelogs', changelogsRouter)
+app.route('/git-changelogs', gitChangelogsRouter)
+app.route('/git-webhooks', gitWebhooksRouter)
 app.route('/users', usersRouter)
 app.route('/', notificationsRouter)
 app.route('/', generalRouter)

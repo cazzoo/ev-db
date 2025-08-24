@@ -1,5 +1,6 @@
 import { AutomatedNotifications } from './automatedNotifications';
 import { AdminNotificationService } from './adminNotificationService';
+import { AutoChangelogService } from './autoChangelogService';
 
 // Simple in-memory job scheduler
 class JobScheduler {
@@ -30,6 +31,12 @@ class JobScheduler {
       AutomatedNotifications.sendDelayedWelcomeNotifications();
     }, 10 * 60 * 1000); // 10 minutes
 
+    // Process Git commits into changelog entries every 5 minutes
+    this.scheduleJob('auto-changelog-processing', async () => {
+      const autoChangelogService = new AutoChangelogService();
+      await autoChangelogService.processNewCommits();
+    }, 5 * 60 * 1000); // 5 minutes
+
     console.log('Job scheduler started successfully');
   }
 
@@ -40,12 +47,12 @@ class JobScheduler {
     }
 
     console.log('Stopping job scheduler...');
-    
+
     for (const [jobName, interval] of this.intervals) {
       clearInterval(interval);
       console.log(`Stopped job: ${jobName}`);
     }
-    
+
     this.intervals.clear();
     this.isRunning = false;
     console.log('Job scheduler stopped');
@@ -54,12 +61,12 @@ class JobScheduler {
   private scheduleJob(name: string, job: () => void, intervalMs: number) {
     // Run immediately
     this.runJobSafely(name, job);
-    
+
     // Then schedule to run at intervals
     const interval = setInterval(() => {
       this.runJobSafely(name, job);
     }, intervalMs);
-    
+
     this.intervals.set(name, interval);
     console.log(`Scheduled job '${name}' to run every ${intervalMs / 1000} seconds`);
   }
@@ -118,11 +125,19 @@ export const ManualJobTriggers = {
     await AutomatedNotifications.sendDelayedWelcomeNotifications();
   },
 
+  async triggerAutoChangelogProcessing() {
+    console.log('Manually triggering auto-changelog processing...');
+    const autoChangelogService = new AutoChangelogService();
+    const result = await autoChangelogService.processNewCommits();
+    console.log('Auto-changelog result:', result);
+    return result;
+  },
+
   async sendTestMaintenanceAlert() {
     console.log('Sending test maintenance alert...');
     const scheduledTime = new Date();
     scheduledTime.setHours(scheduledTime.getHours() + 2); // 2 hours from now
-    
+
     await AutomatedNotifications.sendMaintenanceAlert(
       'Scheduled Maintenance',
       'We will be performing scheduled maintenance to improve system performance and add new features.',

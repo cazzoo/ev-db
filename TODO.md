@@ -21,7 +21,7 @@ No need to keep backward compatibility.
 [] Ability to delete a vehicle while being admin.
 [x] As admin, when clicking on Admin button from nav, it shows sub items, when clicking on one of this item i'm getting redirected but the sub menu is still open.
 [x] Order vehicles and contributions by creation date, descending. The same in personal dashboard. I would like to have spotlight of newly added vehicles/contributions on the main page and on their respective pages.
-[] Create changelogs items based on the commits.
+[x] Create changelogs items based on the commits using drizzle.
 
 # Later
 [] Import vehicle feature: Be able to import vehicle from a remote vehicle page. This would parse the remote location, and extract the information to fill the contribution form.
