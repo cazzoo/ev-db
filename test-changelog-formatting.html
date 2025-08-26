@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Changelog Formatting Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-8">Changelog Formatting Test</h1>
+        
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Before Fix (without whitespace-pre-wrap)</h2>
+            <div class="border-l-2 border-gray-300 pl-4">
+                <h4 class="font-medium mb-1">Implement continuous Git changelog system</h4>
+                <p class="text-sm text-gray-600" id="without-fix">- Add AutoChangelogService for continuous commit processing
+- Integrate background service with 5-minute scheduled processing
+- Create real-time API endpoints for auto-processing management
+- Implement webhook support for GitHub, GitLab, and generic Git providers
+- Add automatic 'Unreleased' changelog creation and management
+- Enable seamless conversion of Git commits to changelog entries
+- Support versioned changelog creation from unreleased entries
+- Maintain backward compatibility with existing manual changelog system
+
+Key features:
+- Continuous processing: Git commits automatically become changelog entries
+- Smart categorization: Features, bug fixes, improvements, etc.
+- Intelligent filtering: Excludes chores, docs, tests from public changelog
+- Real-time integration: Changes appear within 5 minutes or instantly via webhooks
+- Version management: Easy release creation from unreleased entries
+- Comprehensive API: Manual triggers, statistics, and version creation
+- Security: Webhook signature/token verification
+- Monitoring: Processing statistics and health checks</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 class="text-xl font-semibold mb-4">After Fix (with whitespace-pre-wrap)</h2>
+            <div class="border-l-2 border-gray-300 pl-4">
+                <h4 class="font-medium mb-1">Implement continuous Git changelog system</h4>
+                <p class="text-sm text-gray-600 whitespace-pre-wrap" id="with-fix">- Add AutoChangelogService for continuous commit processing
+- Integrate background service with 5-minute scheduled processing
+- Create real-time API endpoints for auto-processing management
+- Implement webhook support for GitHub, GitLab, and generic Git providers
+- Add automatic 'Unreleased' changelog creation and management
+- Enable seamless conversion of Git commits to changelog entries
+- Support versioned changelog creation from unreleased entries
+- Maintain backward compatibility with existing manual changelog system
+
+Key features:
+- Continuous processing: Git commits automatically become changelog entries
+- Smart categorization: Features, bug fixes, improvements, etc.
+- Intelligent filtering: Excludes chores, docs, tests from public changelog
+- Real-time integration: Changes appear within 5 minutes or instantly via webhooks
+- Version management: Easy release creation from unreleased entries
+- Comprehensive API: Manual triggers, statistics, and version creation
+- Security: Webhook signature/token verification
+- Monitoring: Processing statistics and health checks</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

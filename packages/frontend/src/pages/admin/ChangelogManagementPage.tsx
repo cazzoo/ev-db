@@ -186,7 +186,7 @@ const ChangelogManagementPage: React.FC = () => {
                             </div>
                             <div className="flex-1">
                               <div className="font-medium text-sm">{entry.title}</div>
-                              <div className="text-xs text-base-content/60 mt-1">
+                              <div className="text-xs text-base-content/60 mt-1 whitespace-pre-wrap">
                                 {entry.description}
                               </div>
                             </div>

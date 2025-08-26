@@ -2,6 +2,7 @@ import { db } from '../db';
 import { changelogs, changelogEntries } from '../db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { CommitCategorizationService, CommitCategory } from './commitCategorizationService';
+// import { sortByVersionDescending } from '../utils/versionUtils';
 
 export interface ChangelogFormatOptions {
   includeMetadata?: boolean;
@@ -47,7 +48,7 @@ export class ChangelogFormatterService {
    */
   async generateFullMarkdown(options: ChangelogFormatOptions = {}): Promise<string> {
     const changelogs = await this.getAllChangelogData();
-    
+
     let markdown = '# Changelog\n\n';
     markdown += 'All notable changes to this project will be documented in this file.\n\n';
     markdown += 'The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),\n';
@@ -80,7 +81,7 @@ export class ChangelogFormatterService {
    */
   async generateRSS(): Promise<string> {
     const changelogs = await this.getAllChangelogData();
-    
+
     let rss = '<?xml version="1.0" encoding="UTF-8"?>\n';
     rss += '<rss version="2.0">\n';
     rss += '  <channel>\n';
@@ -88,7 +89,7 @@ export class ChangelogFormatterService {
     rss += '    <description>Latest changes and updates to EV Database</description>\n';
     rss += '    <link>https://ev-database.com/changelog</link>\n';
     rss += `    <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>\n`;
-    
+
     for (const changelog of changelogs.slice(0, 20)) { // Limit to 20 most recent
       rss += '    <item>\n';
       rss += `      <title>${this.escapeXml(changelog.title)}</title>\n`;
@@ -97,10 +98,10 @@ export class ChangelogFormatterService {
       rss += `      <guid>changelog-${changelog.version}</guid>\n`;
       rss += '    </item>\n';
     }
-    
+
     rss += '  </channel>\n';
     rss += '</rss>';
-    
+
     return rss;
   }
 
@@ -112,7 +113,7 @@ export class ChangelogFormatterService {
     options: ChangelogFormatOptions
   ): string {
     let markdown = `## [${changelog.version}] - ${this.formatDate(changelog.releaseDate)}\n\n`;
-    
+
     if (changelog.description) {
       markdown += `${changelog.description}\n\n`;
     }
@@ -120,31 +121,31 @@ export class ChangelogFormatterService {
     if (options.groupByCategory !== false) {
       // Group entries by category
       const groupedEntries = this.groupEntriesByCategory(changelog.entries);
-      
+
       // Sort categories by importance
       const categoryOrder: CommitCategory[] = ['breaking', 'security', 'feature', 'bugfix', 'improvement', 'deprecated'];
-      
+
       for (const category of categoryOrder) {
         const entries = groupedEntries[category];
         if (!entries || entries.length === 0) continue;
-        
+
         const categoryInfo = CommitCategorizationService.getCategoryInfo(category);
         markdown += `### ${categoryInfo.emoji} ${categoryInfo.title}\n\n`;
-        
+
         for (const entry of entries) {
           markdown += `- ${entry.title}`;
-          
+
           if (options.includeCommitHashes && entry.commitHash) {
             markdown += ` (${entry.commitHash.substring(0, 7)})`;
           }
-          
+
           markdown += '\n';
-          
+
           if (entry.description && entry.description !== entry.title) {
             markdown += `  ${entry.description}\n`;
           }
         }
-        
+
         markdown += '\n';
       }
     } else {
@@ -152,11 +153,11 @@ export class ChangelogFormatterService {
       for (const entry of changelog.entries) {
         const categoryInfo = CommitCategorizationService.getCategoryInfo(entry.category);
         markdown += `- ${categoryInfo.emoji} **${categoryInfo.title}**: ${entry.title}`;
-        
+
         if (options.includeCommitHashes && entry.commitHash) {
           markdown += ` (${entry.commitHash.substring(0, 7)})`;
         }
-        
+
         markdown += '\n';
       }
     }
@@ -177,25 +178,25 @@ export class ChangelogFormatterService {
    */
   private formatAsPlainText(changelog: FormattedChangelog): string {
     let text = `${changelog.title} - ${this.formatDate(changelog.releaseDate)}\n\n`;
-    
+
     if (changelog.description) {
       text += `${changelog.description}\n\n`;
     }
 
     const groupedEntries = this.groupEntriesByCategory(changelog.entries);
     const categoryOrder: CommitCategory[] = ['breaking', 'security', 'feature', 'bugfix', 'improvement', 'deprecated'];
-    
+
     for (const category of categoryOrder) {
       const entries = groupedEntries[category];
       if (!entries || entries.length === 0) continue;
-      
+
       const categoryInfo = CommitCategorizationService.getCategoryInfo(category);
       text += `${categoryInfo.title}:\n`;
-      
+
       for (const entry of entries) {
         text += `- ${entry.title}\n`;
       }
-      
+
       text += '\n';
     }
 
@@ -247,9 +248,12 @@ export class ChangelogFormatterService {
       .where(eq(changelogs.isPublished, true))
       .orderBy(desc(changelogs.releaseDate));
 
+    // Use the original sorting for now
+    const sortedChangelogs = changelogList;
+
     const result: FormattedChangelog[] = [];
 
-    for (const changelog of changelogList) {
+    for (const changelog of sortedChangelogs) {
       const entries = await db
         .select()
         .from(changelogEntries)

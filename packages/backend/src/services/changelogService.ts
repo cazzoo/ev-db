@@ -2,6 +2,7 @@ import { db } from '../db';
 import { changelogs, changelogEntries, inAppNotifications, users } from '../db/schema';
 import { eq, desc, sql, and, inArray } from 'drizzle-orm';
 import { AdminNotificationService } from './adminNotificationService';
+// import { sortByVersionDescending } from '../utils/versionUtils';
 
 // Types for changelog management
 export interface CreateChangelogRequest {
@@ -277,13 +278,24 @@ export class ChangelogService {
       query = query.where(and(...conditions));
     }
 
-    const changelogResults = await query
-      .orderBy(desc(changelogs.releaseDate))
-      .limit(limit)
-      .offset(offset);
+    // Execute the query to get changelog results
+    const changelogResults = await query;
+
+    // For now, use simple sorting by release date (we'll fix version sorting later)
+    const sortedChangelogs = changelogResults.sort((a, b) => {
+      // Put "Unreleased" first
+      if (a.version === 'Unreleased' && b.version !== 'Unreleased') return -1;
+      if (b.version === 'Unreleased' && a.version !== 'Unreleased') return 1;
+
+      // Sort by release date for others
+      return new Date(b.releaseDate || 0).getTime() - new Date(a.releaseDate || 0).getTime();
+    });
+
+    // Apply pagination after sorting
+    const paginatedChangelogs = sortedChangelogs.slice(offset, offset + limit);
 
     // Get entries for each changelog
-    const changelogIds = changelogResults.map(c => c.id);
+    const changelogIds = paginatedChangelogs.map(c => c.id);
     const allEntries = changelogIds.length > 0 ? await db
       .select()
       .from(changelogEntries)
@@ -300,7 +312,7 @@ export class ChangelogService {
     }, {} as Record<number, typeof allEntries>);
 
     // Combine changelogs with their entries
-    const changelogsWithEntries: ChangelogWithEntries[] = changelogResults.map(changelog => ({
+    const changelogsWithEntries: ChangelogWithEntries[] = paginatedChangelogs.map(changelog => ({
       ...changelog,
       entries: entriesByChangelog[changelog.id] || [],
       author: changelog.authorEmail ? {
@@ -319,15 +331,16 @@ export class ChangelogService {
       countQuery = countQuery.where(and(...conditions));
     }
 
-    const totalCount = await countQuery;
+    const [totalCountResult] = await countQuery;
+    const total = totalCountResult.count;
 
     return {
       changelogs: changelogsWithEntries,
       pagination: {
         page,
         limit,
-        total: totalCount[0].count,
-        totalPages: Math.ceil(totalCount[0].count / limit),
+        total,
+        totalPages: Math.ceil(total / limit),
       },
     };
   }

@@ -35,7 +35,7 @@ const ChangelogPage: React.FC = () => {
       setChangelogs(result.changelogs);
       setCurrentPage(result.pagination.page);
       setTotalPages(result.pagination.totalPages);
-      
+
       // If no specific version is selected, show the latest
       if (result.changelogs.length > 0 && !selectedChangelog) {
         setSelectedChangelog(result.changelogs[0]);
@@ -53,7 +53,7 @@ const ChangelogPage: React.FC = () => {
       setError(null);
       const changelog = await getPublicChangelogByVersion(version);
       setSelectedChangelog(changelog);
-      
+
       // Also load the list for navigation
       const result = await getPublicChangelogs(1, 10);
       setChangelogs(result.changelogs);
@@ -109,7 +109,7 @@ const ChangelogPage: React.FC = () => {
           <div className="card bg-base-100 shadow-sm border border-base-200 sticky top-4">
             <div className="card-body p-4">
               <h2 className="font-semibold mb-4">Versions</h2>
-              
+
               {changelogs.length === 0 ? (
                 <div className="text-center py-8 text-base-content/60">
                   <div className="text-3xl mb-2">📋</div>
@@ -194,7 +194,7 @@ const ChangelogPage: React.FC = () => {
                     {sortEntriesByCategory(selectedChangelog.entries).reduce((acc, entry) => {
                       const categoryInfo = getCategoryInfo(entry.category);
                       let categoryGroup = acc.find(group => group.category === entry.category);
-                      
+
                       if (!categoryGroup) {
                         categoryGroup = {
                           category: entry.category,
@@ -203,7 +203,7 @@ const ChangelogPage: React.FC = () => {
                         };
                         acc.push(categoryGroup);
                       }
-                      
+
                       categoryGroup.entries.push(entry);
                       return acc;
                     }, [] as Array<{ category: string; categoryInfo: any; entries: any[] }>).map((group) => (
@@ -220,7 +220,7 @@ const ChangelogPage: React.FC = () => {
                           {group.entries.map((entry) => (
                             <div key={entry.id} className="border-l-2 border-base-300 pl-4">
                               <h4 className="font-medium mb-1">{entry.title}</h4>
-                              <p className="text-sm text-base-content/70">{entry.description}</p>
+                              <p className="text-sm text-base-content/70 whitespace-pre-wrap">{entry.description}</p>
                             </div>
                           ))}
                         </div>

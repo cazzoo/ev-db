@@ -25,7 +25,7 @@ No need to keep backward compatibility.
 
 # Later
 [] Import vehicle feature: Be able to import vehicle from a remote vehicle page. This would parse the remote location, and extract the information to fill the contribution form.
-[] Add CI (github actions) to build/test the app for each commit.
+[] Add CI (github actions) to build/test the app for each commit/tag based on the best standards of the industry. This should include security scans, performance tests, accessibility tests, and report any building/linting issues to the PR.
 [] Email/Notification system to notify users of important events (contribution approved/rejected, new message, ...etc.).
 [] Create dockerfile(s)/compose/stack to package/deploy this application.
 [] Add a monetezation mechanism for the users to top-up their credit balance. Use Wise business.

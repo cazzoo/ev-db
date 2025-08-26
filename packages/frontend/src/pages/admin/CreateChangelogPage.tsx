@@ -97,7 +97,7 @@ const CreateChangelogPage: React.FC = () => {
     if (targetIndex < 0 || targetIndex >= newEntries.length) return;
 
     [newEntries[index], newEntries[targetIndex]] = [newEntries[targetIndex], newEntries[index]];
-    
+
     // Update sort orders
     newEntries.forEach((entry, i) => {
       entry.sortOrder = i + 1;
@@ -111,7 +111,7 @@ const CreateChangelogPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.version.trim() || !formData.title.trim()) {
       setError('Version and title are required');
       return;
@@ -133,7 +133,7 @@ const CreateChangelogPage: React.FC = () => {
 
       await createChangelog(changelogData);
       setSuccess('Changelog created successfully!');
-      
+
       // Redirect after a short delay
       setTimeout(() => {
         navigate('/admin/changelogs');
@@ -176,7 +176,7 @@ const CreateChangelogPage: React.FC = () => {
         <div className="card bg-base-100 shadow-sm border border-base-200">
           <div className="card-body">
             <h2 className="card-title text-lg mb-4">Basic Information</h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="form-control">
                 <label className="label">
@@ -264,7 +264,7 @@ const CreateChangelogPage: React.FC = () => {
         <div className="card bg-base-100 shadow-sm border border-base-200">
           <div className="card-body">
             <h2 className="card-title text-lg mb-4">Add Changelog Entry</h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div className="form-control">
                 <label className="label">
@@ -327,7 +327,7 @@ const CreateChangelogPage: React.FC = () => {
               <h2 className="card-title text-lg mb-4">
                 Changelog Entries ({formData.entries.length})
               </h2>
-              
+
               <div className="space-y-3">
                 {formData.entries.map((entry, index) => {
                   const categoryInfo = getCategoryInfo(entry.category);
@@ -342,9 +342,9 @@ const CreateChangelogPage: React.FC = () => {
                             <span className="text-sm text-base-content/60">#{index + 1}</span>
                           </div>
                           <h4 className="font-medium mb-1">{entry.title}</h4>
-                          <p className="text-sm text-base-content/70">{entry.description}</p>
+                          <p className="text-sm text-base-content/70 whitespace-pre-wrap">{entry.description}</p>
                         </div>
-                        
+
                         <div className="flex gap-1">
                           <button
                             type="button"
