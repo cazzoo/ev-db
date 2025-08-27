@@ -8,17 +8,23 @@
   },
   "dependencies": {
     "@faker-js/faker": "^9.9.0",
-    "@libsql/client": "^0.3.6",
+    "@hono/node-server": "^1.19.0",
+    "@libsql/client": "^0.15.14",
     "@types/nodemailer": "^7.0.0",
     "bcryptjs": "^2.4.3",
-    "drizzle-orm": "^0.29.0",
-    "hono": "^3.11.7",
-    "nodemailer": "^7.0.5"
+    "drizzle-orm": "^0.44.5",
+    "hono": "^4.9.0",
+    "nodemailer": "^7.0.5",
+    "zod": "^4.1.4"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.19.10",
-    "drizzle-kit": "^0.20.6",
+    "@typescript-eslint/eslint-plugin": "^6.10.0",
+    "@typescript-eslint/parser": "^6.10.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "drizzle-kit": "^0.31.4",
+    "eslint": "^8.53.0",
     "tsx": "^3.14.0",
     "typescript": "^5.2.2",
     "vitest": "^3.2.4"

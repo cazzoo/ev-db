@@ -31,7 +31,7 @@ const DEFAULT_DURATION = 5000; // 5 seconds
 
 export const ToastProvider = ({ children }: { children: ReactNode }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [timers, setTimers] = useState<Map<string, number>>(new Map());
+  const [timers, setTimers] = useState<Map<string, NodeJS.Timeout>>(new Map());
 
   const generateId = useCallback(() => {
     return `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;

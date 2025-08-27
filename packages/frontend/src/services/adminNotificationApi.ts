@@ -240,7 +240,7 @@ export const getAllUsers = async (): Promise<Array<{ id: number; email: string; 
     },
   });
   const data = await handleApiResponse(response);
-  return data.users; // Extract users array from the response
+  return (data as any).users; // Extract users array from the response
 };
 
 // Available roles for targeting

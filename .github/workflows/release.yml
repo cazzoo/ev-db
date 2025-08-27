@@ -1,0 +1,330 @@
+name: Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.2.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  NODE_VERSION: '18'
+  PNPM_VERSION: '10.7.0'
+
+jobs:
+  # Job 1: Validate Release
+  validate-release:
+    name: Validate Release
+    runs-on: ubuntu-latest
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-prerelease: ${{ steps.version.outputs.is-prerelease }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            IS_PRERELEASE="${{ github.event.inputs.prerelease }}"
+          else
+            VERSION="${{ github.ref_name }}"
+            IS_PRERELEASE="false"
+            if [[ "$VERSION" =~ -[a-zA-Z] ]]; then
+              IS_PRERELEASE="true"
+            fi
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "is-prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          echo "Release version: $VERSION"
+          echo "Is prerelease: $IS_PRERELEASE"
+
+      - name: Validate version format
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
+            echo "Invalid version format: $VERSION"
+            echo "Expected format: v1.2.3 or v1.2.3-alpha.1"
+            exit 1
+          fi
+
+  # Job 2: Build Release Artifacts
+  build-release:
+    name: Build Release Artifacts
+    runs-on: ubuntu-latest
+    needs: validate-release
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run tests
+        run: pnpm test:all
+
+      - name: Build backend
+        run: pnpm --filter backend exec tsc
+
+      - name: Build frontend
+        run: pnpm --filter frontend build
+
+      - name: Create release archive
+        run: |
+          mkdir -p release-artifacts
+
+          # Create backend archive
+          cd packages/backend
+          tar -czf ../../release-artifacts/backend-${{ needs.validate-release.outputs.version }}.tar.gz \
+            dist/ package.json pnpm-lock.yaml drizzle/ src/db/
+          cd ../..
+
+          # Create frontend archive
+          cd packages/frontend
+          tar -czf ../../release-artifacts/frontend-${{ needs.validate-release.outputs.version }}.tar.gz \
+            dist/ package.json
+          cd ../..
+
+          # Create full application archive
+          tar -czf release-artifacts/ev-db-${{ needs.validate-release.outputs.version }}.tar.gz \
+            packages/ docs/ package.json pnpm-workspace.yaml README.md
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: release-artifacts/
+
+  # Job 3: Generate Changelog
+  generate-changelog:
+    name: Generate Changelog
+    runs-on: ubuntu-latest
+    needs: validate-release
+
+    outputs:
+      changelog-content: ${{ steps.changelog.outputs.content }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Setup database and generate changelog
+        id: changelog
+        run: |
+          cd packages/backend
+
+          # Initialize database
+          pnpm exec tsx src/db/seed.ts
+
+          # Generate changelog using the existing system
+          CHANGELOG_RESPONSE=$(pnpm exec tsx -e "
+            import { GitChangelogService } from './src/services/gitChangelogService.js';
+
+            async function generateChangelog() {
+              try {
+                const service = new GitChangelogService();
+
+                // Create version entry
+                const result = await service.createVersionFromGit({
+                  version: '${{ needs.validate-release.outputs.version }}',
+                  title: 'Release ${{ needs.validate-release.outputs.version }}',
+                  includeUnreleased: true
+                });
+
+                // Get markdown content
+                const markdown = await service.getChangelogMarkdown('${{ needs.validate-release.outputs.version }}');
+
+                console.log('CHANGELOG_START');
+                console.log(markdown);
+                console.log('CHANGELOG_END');
+
+                return result;
+              } catch (error) {
+                console.error('Error generating changelog:', error);
+                process.exit(1);
+              }
+            }
+
+            generateChangelog();
+          ")
+
+          # Extract changelog content
+          CHANGELOG_CONTENT=$(echo "$CHANGELOG_RESPONSE" | sed -n '/CHANGELOG_START/,/CHANGELOG_END/p' | sed '1d;$d')
+
+          # Save to file and output
+          echo "$CHANGELOG_CONTENT" > ../../changelog-${{ needs.validate-release.outputs.version }}.md
+
+          # Set output (escape for GitHub Actions)
+          {
+            echo 'content<<EOF'
+            echo "$CHANGELOG_CONTENT"
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
+
+      - name: Upload changelog
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: changelog-${{ needs.validate-release.outputs.version }}.md
+
+  # Job 4: Create GitHub Release
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-release, generate-changelog]
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.validate-release.outputs.version }}
+          release_name: Release ${{ needs.validate-release.outputs.version }}
+          body: ${{ needs.generate-changelog.outputs.changelog-content }}
+          draft: false
+          prerelease: ${{ needs.validate-release.outputs.is-prerelease == 'true' }}
+
+      - name: Upload Release Assets
+        run: |
+          # Upload backend archive
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/gzip" \
+            --data-binary @release-artifacts/backend-${{ needs.validate-release.outputs.version }}.tar.gz \
+            "${{ steps.create_release.outputs.upload_url }}?name=backend-${{ needs.validate-release.outputs.version }}.tar.gz"
+
+          # Upload frontend archive
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/gzip" \
+            --data-binary @release-artifacts/frontend-${{ needs.validate-release.outputs.version }}.tar.gz \
+            "${{ steps.create_release.outputs.upload_url }}?name=frontend-${{ needs.validate-release.outputs.version }}.tar.gz"
+
+          # Upload full application archive
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/gzip" \
+            --data-binary @release-artifacts/ev-db-${{ needs.validate-release.outputs.version }}.tar.gz \
+            "${{ steps.create_release.outputs.upload_url }}?name=ev-db-${{ needs.validate-release.outputs.version }}.tar.gz"
+
+  # Job 5: Post-Release Tasks
+  post-release:
+    name: Post-Release Tasks
+    runs-on: ubuntu-latest
+    needs: [validate-release, create-release]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Trigger webhook notifications
+        run: |
+          cd packages/backend
+
+          # Trigger Git webhook to update changelog system
+          pnpm exec tsx -e "
+            import { AutoChangelogService } from './src/services/autoChangelogService.js';
+
+            async function triggerWebhook() {
+              try {
+                const service = new AutoChangelogService();
+                const result = await service.processNewCommits();
+                console.log('Webhook triggered successfully:', result);
+              } catch (error) {
+                console.error('Error triggering webhook:', error);
+              }
+            }
+
+            triggerWebhook();
+          "
+
+      - name: Create release summary
+        run: |
+          echo "# 🚀 Release ${{ needs.validate-release.outputs.version }} Complete!" > release-summary.md
+          echo "" >> release-summary.md
+          echo "## Release Details:" >> release-summary.md
+          echo "- **Version**: ${{ needs.validate-release.outputs.version }}" >> release-summary.md
+          echo "- **Type**: ${{ needs.validate-release.outputs.is-prerelease == 'true' && 'Pre-release' || 'Stable Release' }}" >> release-summary.md
+          echo "- **GitHub Release**: [View Release](${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.validate-release.outputs.version }})" >> release-summary.md
+          echo "" >> release-summary.md
+          echo "## Artifacts:" >> release-summary.md
+          echo "- Backend build archive" >> release-summary.md
+          echo "- Frontend build archive" >> release-summary.md
+          echo "- Complete application archive" >> release-summary.md
+          echo "- Generated changelog" >> release-summary.md
+
+      - name: Upload release summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-summary
+          path: release-summary.md

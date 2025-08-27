@@ -181,7 +181,7 @@ const CustomFieldsManagementPage: React.FC = () => {
       sortable: true,
       render: (value, field) => (
         <div>
-          <div className="font-medium">{value}</div>
+          <div className="font-medium">{String(value)}</div>
           <div className="text-sm text-base-content/60">Key: {field.key}</div>
         </div>
       )
@@ -192,7 +192,7 @@ const CustomFieldsManagementPage: React.FC = () => {
       accessor: 'fieldType',
       sortable: true,
       render: (value) => (
-        <div className="badge badge-outline">{value}</div>
+        <div className="badge badge-outline">{String(value)}</div>
       )
     },
     {
@@ -202,7 +202,7 @@ const CustomFieldsManagementPage: React.FC = () => {
       sortable: true,
       render: (value) => (
         <div className="text-center">
-          <div className="font-medium">{value}</div>
+          <div className="font-medium">{String(value)}</div>
           <div className="text-xs text-base-content/60">times used</div>
         </div>
       )
@@ -226,7 +226,7 @@ const CustomFieldsManagementPage: React.FC = () => {
       header: 'Order',
       accessor: 'displayOrder',
       sortable: true,
-      render: (value) => <span className="font-mono">{value}</span>
+      render: (value) => <span className="font-mono">{String(value)}</span>
     },
     {
       key: 'actions',

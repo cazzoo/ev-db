@@ -19,7 +19,7 @@ const VehicleSpotlightCarousel: React.FC<VehicleSpotlightCarouselProps> = ({
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const carouselRef = useRef<HTMLDivElement>(null);
-  const autoPlayRef = useRef<number | null>(null);
+  const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
 
   // Auto-play functionality
   useEffect(() => {
@@ -100,7 +100,7 @@ const VehicleSpotlightCarousel: React.FC<VehicleSpotlightCarouselProps> = ({
     const vehicle = vehicles[0];
     return (
       <div className={`relative ${className}`}>
-        <div 
+        <div
           className="card bg-base-100 shadow-2xl cursor-pointer hover:shadow-3xl transition-all duration-300 transform hover:scale-[1.02]"
           onClick={() => handleVehicleClick(vehicle)}
         >
@@ -166,7 +166,7 @@ const VehicleSpotlightCarousel: React.FC<VehicleSpotlightCarouselProps> = ({
             id={`vehicle-slide-${index}`}
             className="carousel-item relative w-full h-full"
           >
-            <div 
+            <div
               className="relative w-full h-full cursor-pointer group"
               onClick={() => handleVehicleClick(vehicle)}
             >
@@ -196,7 +196,7 @@ const VehicleSpotlightCarousel: React.FC<VehicleSpotlightCarouselProps> = ({
                   <div className="flex-1">
                     <h3 className="text-4xl font-bold mb-2">{vehicle.make} {vehicle.model}</h3>
                     <p className="text-2xl text-white/90 mb-4">{vehicle.year}</p>
-                    
+
                     {/* Specs */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>

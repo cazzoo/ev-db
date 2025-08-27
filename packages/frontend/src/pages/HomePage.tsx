@@ -88,7 +88,7 @@ const HomePage = () => {
   };
 
   // Handle vehicle click - navigate to vehicles page
-  const handleVehicleClick = (vehicle: Vehicle) => {
+  const handleVehicleClick = (_vehicle: Vehicle) => {
     navigate('/vehicles');
   };
 

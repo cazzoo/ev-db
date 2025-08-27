@@ -78,7 +78,7 @@ const MultiStepContributionForm: React.FC<MultiStepContributionFormProps> = ({
   const [targetVehicleId] = useState<number | undefined>(initialTargetVehicleId);
   const [duplicateCheck, setDuplicateCheck] = useState<DuplicateCheckResult | null>(null);
   const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
-  const duplicateCheckTimeoutRef = useRef<number | null>(null);
+  const duplicateCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load suggestions on mount
   useEffect(() => {

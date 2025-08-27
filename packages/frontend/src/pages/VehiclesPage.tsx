@@ -1,7 +1,7 @@
 import { useEffect, useState, useContext } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
-  fetchVehicles,
+
   fetchVehiclesPaginated,
   createVehicle,
   updateVehicle,
@@ -14,7 +14,7 @@ import {
   fetchRecentVehicles,
   Contribution,
   DuplicateError,
-  PaginatedResponse,
+
   Pagination
 } from '../services/api';
 import ContributionForm from '../components/ContributionForm';

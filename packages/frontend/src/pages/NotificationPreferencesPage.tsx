@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   getNotificationPreferences,
-  updateNotificationPreference,
+
   batchUpdatePreferences,
   resetPreferencesToDefaults,
   NotificationPreference,
@@ -10,7 +10,7 @@ import {
   PREFERENCE_GROUPS,
   NOTIFICATION_CHANNELS,
   isChannelAvailable,
-  getChannelInfo
+
 } from '../services/notificationPreferencesApi';
 
 const NotificationPreferencesPage: React.FC = () => {
@@ -46,12 +46,12 @@ const NotificationPreferencesPage: React.FC = () => {
 
   const isPreferenceEnabled = (channel: string, eventType: string): boolean => {
     const key = getPreferenceKey(channel, eventType);
-    
+
     // Check pending changes first
     if (pendingChanges.has(key)) {
       return pendingChanges.get(key)!;
     }
-    
+
     // Check existing preferences
     const preference = preferences.find(p => p.channel === channel && p.eventType === eventType);
     return preference ? preference.enabled : false;
@@ -60,17 +60,17 @@ const NotificationPreferencesPage: React.FC = () => {
   const handlePreferenceChange = (channel: string, eventType: string, enabled: boolean) => {
     const key = getPreferenceKey(channel, eventType);
     const currentValue = isPreferenceEnabled(channel, eventType);
-    
+
     if (enabled === currentValue && !pendingChanges.has(key)) {
       return; // No change
     }
-    
+
     const newPendingChanges = new Map(pendingChanges);
-    
+
     // Check if this change reverts to the original value
     const originalPreference = preferences.find(p => p.channel === channel && p.eventType === eventType);
     const originalValue = originalPreference ? originalPreference.enabled : false;
-    
+
     if (enabled === originalValue) {
       // Revert to original, remove from pending changes
       newPendingChanges.delete(key);
@@ -78,7 +78,7 @@ const NotificationPreferencesPage: React.FC = () => {
       // Add to pending changes
       newPendingChanges.set(key, enabled);
     }
-    
+
     setPendingChanges(newPendingChanges);
     setHasChanges(newPendingChanges.size > 0);
     setError(null);
@@ -94,7 +94,7 @@ const NotificationPreferencesPage: React.FC = () => {
       setSuccess(null);
 
       const updates: UpdatePreferenceRequest[] = [];
-      
+
       for (const [key, enabled] of pendingChanges) {
         const [channel, eventType] = key.split(':');
         updates.push({
@@ -105,10 +105,10 @@ const NotificationPreferencesPage: React.FC = () => {
       }
 
       await batchUpdatePreferences(updates);
-      
+
       // Reload preferences to get the updated state
       await loadPreferences();
-      
+
       setPendingChanges(new Map());
       setHasChanges(false);
       setSuccess('Notification preferences updated successfully!');
@@ -131,7 +131,7 @@ const NotificationPreferencesPage: React.FC = () => {
 
       await resetPreferencesToDefaults();
       await loadPreferences();
-      
+
       setPendingChanges(new Map());
       setHasChanges(false);
       setSuccess('Notification preferences reset to defaults!');
@@ -288,7 +288,7 @@ const NotificationPreferencesPage: React.FC = () => {
         >
           Reset to Defaults
         </button>
-        
+
         <div className="flex gap-2">
           <button
             onClick={() => navigate('/settings')}

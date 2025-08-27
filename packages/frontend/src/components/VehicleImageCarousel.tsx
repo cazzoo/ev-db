@@ -33,7 +33,7 @@ const VehicleImageCarousel: React.FC<VehicleImageCarouselProps> = ({
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const carouselRef = useRef<HTMLDivElement>(null);
-  const autoPlayRef = useRef<number | null>(null);
+  const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
 
   // If no images provided, show placeholder
   const hasImages = images && images.length > 0;

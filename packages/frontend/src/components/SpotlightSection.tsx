@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Vehicle, Contribution } from '../services/api';
-import VehicleCard from './VehicleCard';
+
 import VehicleSpotlightCarousel from './VehicleSpotlightCarousel';
 
 interface SpotlightSectionProps {

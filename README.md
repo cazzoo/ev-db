@@ -62,6 +62,8 @@ The EV Database is a modern web application that allows users to browse, contrib
 - **ESLint** for code quality
 - **TypeScript** for type checking
 - **Hot reload** for development
+- **Vitest** for testing with coverage
+- **GitHub Actions** for CI/CD pipeline
 
 ## 🚀 Development Quick Start
 
@@ -151,9 +153,67 @@ pnpm --filter backend dev       # Start development server with hot reload
 pnpm --filter backend db:seed   # Seed database with sample data
 ```
 
+**Testing:**
+```bash
+pnpm test:all                   # Run all tests
+pnpm test:coverage              # Run tests with coverage
+pnpm ci:test                    # Run full CI test suite (typecheck + lint + test)
+```
+
+**Quality Checks:**
+```bash
+pnpm lint:all                   # Run ESLint on all packages
+pnpm typecheck:all              # Run TypeScript compiler checks
+```
+
 ### Environment Setup
 
 The application works out of the box with default settings. For production deployment, you may want to configure:
+
+## 🚀 CI/CD Pipeline
+
+This project includes a comprehensive GitHub Actions CI/CD pipeline that automatically:
+
+### ✅ **Quality Assurance**
+- Builds and tests on multiple Node.js versions (18, 20)
+- Runs TypeScript compilation checks
+- Executes ESLint linting for code quality
+- Generates test coverage reports with thresholds
+- Performs integration testing
+
+### 🔒 **Security & Compliance**
+- CodeQL static analysis for security vulnerabilities
+- Dependency vulnerability scanning with npm audit and Snyk
+- Secret detection to prevent credential leaks
+- License compliance checking
+- Daily security audits with automated issue creation
+
+### ⚡ **Performance & Accessibility**
+- Lighthouse CI audits for performance, accessibility, and SEO
+- Bundle size analysis with change tracking
+- Performance regression testing
+- WCAG 2.1 AA accessibility compliance testing
+
+### 📦 **Release Management**
+- Automated changelog generation from Git commits
+- GitHub release creation with build artifacts
+- Version validation and semantic versioning
+- Integration with the existing Git changelog system
+
+### 🔄 **Maintenance**
+- Weekly automated dependency updates
+- Security audit reports
+- Automated Pull Request creation for updates
+
+### **Getting Started with CI/CD**
+1. Push your code to trigger the pipeline
+2. Monitor the Actions tab for workflow execution
+3. Review automated PR comments for detailed results
+4. Configure optional secrets for enhanced features (Snyk token, etc.)
+
+For detailed information, see the [CI/CD Pipeline Documentation](docs/CI_CD_PIPELINE.md).
+
+## 🌍 Environment Setup
 
 - Database connection (currently uses SQLite)
 - File upload storage location

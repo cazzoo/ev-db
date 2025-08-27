@@ -228,6 +228,16 @@ app.get('/maintenance-status', async (c) => {
   }
 });
 
+// Health check endpoint for CI/CD
+app.get('/api/health', (c) => {
+  return c.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version: process.env.npm_package_version || '1.0.0',
+    environment: process.env.NODE_ENV || 'development'
+  })
+});
+
 // Development seed routes
 if (process.env.NODE_ENV !== 'production') {
   app.route('/seed', seedRouter)

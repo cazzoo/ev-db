@@ -78,7 +78,6 @@ const VehicleCardGrid: React.FC<VehicleCardGridProps> = ({
   pendingContributions = [],
   isAuthenticated = false,
   searchQuery = '',
-  searchFields,
   pagination,
   onPageChange
 }) => {

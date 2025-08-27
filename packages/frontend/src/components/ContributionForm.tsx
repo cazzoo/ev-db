@@ -28,7 +28,7 @@ const ContributionForm: React.FC<ContributionFormProps> = ({ onSubmit, onCancel,
   // Real-time duplicate detection state
   const [duplicateCheck, setDuplicateCheck] = useState<DuplicateCheckResult | null>(null);
   const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
-  const duplicateCheckTimeoutRef = useRef<number | null>(null);
+  const duplicateCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [lastCheckTrigger, setLastCheckTrigger] = useState<'typing' | 'blur' | null>(null);
 
   useEffect(() => {

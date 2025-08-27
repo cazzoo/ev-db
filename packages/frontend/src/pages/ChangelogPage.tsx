@@ -3,7 +3,6 @@ import { useParams } from 'react-router-dom';
 import {
   getPublicChangelogs,
   getPublicChangelogByVersion,
-  getLatestChangelog,
   Changelog,
   getCategoryInfo,
   formatReleaseDate,
